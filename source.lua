@@ -85,6 +85,57 @@ local espinstances = {}
 local espfunctions = {}
 local hover_targets = {} -- store hover animation data
 
+-- Cleanup function to reset ESP when leaving game
+local function cleanup_esp()
+    for instance, data in pairs(espinstances) do
+        if data.box then
+            if data.box.outline then data.box.outline:Remove() end
+            if data.box.fill then data.box.fill:Remove() end
+            for _, line in ipairs(data.box.corner_fill or {}) do
+                if line then line:Remove() end
+            end
+            for _, line in ipairs(data.box.corner_outline or {}) do
+                if line then line:Remove() end
+            end
+        end
+        if data.healthbar then
+            if data.healthbar.outline then data.healthbar.outline:Remove() end
+            if data.healthbar.fill then data.healthbar.fill:Remove() end
+        end
+        if data.name then
+            if data.name.text then data.name.text:Remove() end
+            if data.name.tag_bracket_left then data.name.tag_bracket_left:Remove() end
+            if data.name.tag_letter then data.name.tag_letter:Remove() end
+            if data.name.tag_bracket_right then data.name.tag_bracket_right:Remove() end
+        end
+        if data.distance then
+            data.distance:Remove()
+        end
+        if data.tracer then
+            if data.tracer.outline then data.tracer.outline:Remove() end
+            if data.tracer.fill then data.tracer.fill:Remove() end
+        end
+    end
+    
+    -- Clear all tables
+    espinstances = {}
+    hover_targets = {}
+end
+
+-- Connect cleanup to game leaving
+game.Players.PlayerRemoving:Connect(function(player)
+    if player == game.Players.LocalPlayer then
+        cleanup_esp()
+    end
+end)
+
+-- Also cleanup when workspace changes (teleporting between places)
+workspace.ChildRemoved:Connect(function(child)
+    if child.Name == "Live" or child.Name == "Players" then
+        cleanup_esp()
+    end
+end)
+
 -- // services
 local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
@@ -406,6 +457,18 @@ function espfunctions.add_distance(instance)
     espinstances[instance].distance = text
 end
 
+function espfunctions.cleanup()
+    cleanup_esp()
+    print("🧹 ESP cleaned up - ready for re-injection")
+end
+
+function espfunctions.reset()
+    cleanup_esp()
+    -- Reset hover targets
+    hover_targets = {}
+    print("🔄 ESP completely reset")
+end
+
 function espfunctions.add_tracer(instance)
     if not instance or espinstances[instance] and espinstances[instance].tracer then return end
     
@@ -426,6 +489,12 @@ end
 
 -- // main thread
 run_service.RenderStepped:Connect(function()
+    -- Safety check - if we're not in a valid game state, cleanup and return
+    if not game.Players.LocalPlayer or not workspace.CurrentCamera then
+        cleanup_esp()
+        return
+    end
+    
     for instance, data in pairs(espinstances) do
         if not instance or not instance.Parent then
             if data.box then
