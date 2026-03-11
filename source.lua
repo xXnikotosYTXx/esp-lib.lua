@@ -336,6 +336,26 @@ local function get_bounding_box(instance)
         end
     end
     
+    -- ИСПРАВЛЕНИЕ: Минимальный размер бокса и правильные пропорции
+    if onscreen then
+        local width = max.X - min.X
+        local height = max.Y - min.Y
+        local center_x = (min.X + max.X) / 2
+        local center_y = (min.Y + max.Y) / 2
+        
+        -- Минимальные размеры для дальних дистанций
+        local min_width = 20
+        local min_height = 30
+        
+        -- Применяем минимальные размеры
+        width = math.max(width, min_width)
+        height = math.max(height, min_height)
+        
+        -- Пересчитываем min/max с новыми размерами и центрированием
+        min = Vector2.new(center_x - width/2, center_y - height/2)
+        max = Vector2.new(center_x + width/2, center_y + height/2)
+    end
+    
     return min, max, onscreen
 end
 
