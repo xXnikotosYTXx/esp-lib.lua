@@ -82,6 +82,12 @@ esplib.skeleton = esplib.skeleton or {
 local espinstances = {}
 local espfunctions = {}
 
+-- // services
+local run_service = game:GetService("RunService")
+local players = game:GetService("Players")
+local user_input_service = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
+
 -- // helper functions
 local function lerp_color(a, b, t)
     return Color3.new(
@@ -101,7 +107,7 @@ local function get_distance(instance)
                 return (camera.CFrame.Position - part.Position).Magnitude
             end
         end
-    else
+    elseif instance:IsA("BasePart") then
         return (camera.CFrame.Position - instance.Position).Magnitude
     end
     return 999
@@ -135,12 +141,6 @@ local function calculate_fade_transparency(distance)
         return 1 - (fade_factor * (1 - esplib.fade.min_transparency))
     end
 end
-
--- // services
-local run_service = game:GetService("RunService")
-local players = game:GetService("Players")
-local user_input_service = game:GetService("UserInputService")
-local camera = workspace.CurrentCamera
 
 -- // functions
 local function get_bounding_box(instance)
