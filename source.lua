@@ -753,8 +753,8 @@ run_service.RenderStepped:Connect(function()
                 
                 local name_str = instance.Name
                 local show_tag = false
-                local tag_color = Color3.new(1, 1, 1)
                 local tag_letter = ""
+                local health_str = ""
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -767,11 +767,9 @@ run_service.RenderStepped:Connect(function()
                             if is_friend(instance) then
                                 show_tag = true
                                 tag_letter = "F"
-                                tag_color = esplib.friends.friend_color -- green F
                             else
                                 show_tag = true
                                 tag_letter = "E"
-                                tag_color = esplib.friends.enemy_color -- red E
                             end
                         end
                     end
@@ -779,55 +777,63 @@ run_service.RenderStepped:Connect(function()
                     if esplib.name.show_health and humanoid.MaxHealth > 0 then
                         local current_health = math.floor(humanoid.Health)
                         local max_health = math.floor(humanoid.MaxHealth)
-                        name_str = name_str .. " [" .. current_health .. ":" .. max_health .. "]"
+                        health_str = " [" .. current_health .. ":" .. max_health .. "]"
                     end
                 end
                 
-                -- Show tag parts if needed
+                -- Create final name string with health but WITHOUT tag
+                local final_name = name_str .. health_str
+                
+                -- Show tag with gradient effect if needed
                 if show_tag then
-                    -- ПРОСТОЕ решение - фиксированная позиция тега относительно центра имени
-                    local tag_width = 24 -- ширина тега [E] примерно 24 пикселя
-                    local gap = 10 -- небольшой отступ между тегом и именем
+                    -- Position tag right after the name
+                    local name_width = #name_str * 7 -- approximate width
+                    local tag_start_x = center_x + (name_width / 2) + 5 -- right after name with small gap
                     
-                    -- Позиция тега - слева от центра имени
-                    local tag_center_x = center_x - gap - (tag_width / 2)
+                    -- Gradient colors based on friend/enemy
+                    local bracket_color, letter_color
+                    if tag_letter == "F" then
+                        -- Friend: cyan to green gradient
+                        bracket_color = Color3.new(0, 1, 1) -- cyan brackets
+                        letter_color = Color3.new(0, 1, 0.5) -- green-cyan letter
+                    else
+                        -- Enemy: red to purple gradient  
+                        bracket_color = Color3.new(1, 0, 0.5) -- red-purple brackets
+                        letter_color = Color3.new(0.8, 0, 0.8) -- purple letter
+                    end
                     
-                    -- White left bracket [
+                    -- Left bracket [
                     name_obj.tag_bracket_left.Text = "["
                     name_obj.tag_bracket_left.Size = esplib.name.size
-                    name_obj.tag_bracket_left.Color = Color3.new(1, 1, 1) -- white
+                    name_obj.tag_bracket_left.Color = bracket_color
                     name_obj.tag_bracket_left.Transparency = transparency
-                    name_obj.tag_bracket_left.Position = Vector2.new(tag_center_x - 12, y)
+                    name_obj.tag_bracket_left.Position = Vector2.new(tag_start_x, y)
                     name_obj.tag_bracket_left.Visible = true
                     
                     -- Colored letter E/F
                     name_obj.tag_letter.Text = tag_letter
                     name_obj.tag_letter.Size = esplib.name.size
-                    name_obj.tag_letter.Color = tag_color -- red E or green F
+                    name_obj.tag_letter.Color = letter_color
                     name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(tag_center_x - 4, y)
+                    name_obj.tag_letter.Position = Vector2.new(tag_start_x + 8, y)
                     name_obj.tag_letter.Visible = true
                     
-                    -- White right bracket ]
+                    -- Right bracket ]
                     name_obj.tag_bracket_right.Text = "]"
                     name_obj.tag_bracket_right.Size = esplib.name.size
-                    name_obj.tag_bracket_right.Color = Color3.new(1, 1, 1) -- white
+                    name_obj.tag_bracket_right.Color = bracket_color
                     name_obj.tag_bracket_right.Transparency = transparency
-                    name_obj.tag_bracket_right.Position = Vector2.new(tag_center_x + 4, y)
+                    name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
                     name_obj.tag_bracket_right.Visible = true
-                    
-                    -- Устанавливаем текст имени
-                    name_obj.text.Text = name_str
-                    name_obj.text.Size = esplib.name.size
                 else
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
                     name_obj.tag_bracket_right.Visible = false
-                    
-                    -- Устанавливаем текст и размер когда нет тега
-                    name_obj.text.Text = name_str
-                    name_obj.text.Size = esplib.name.size
                 end
+                
+                -- Show name and health (white)
+                name_obj.text.Text = final_name
+                name_obj.text.Size = esplib.name.size
                 
                 -- Name stays centered
                 name_obj.text.Position = Vector2.new(center_x, y)
