@@ -136,16 +136,7 @@ end
 local function get_esp_color(instance)
     local base_color = Color3.new(1, 1, 1) -- default white
     
-    -- Friends/Enemy system
-    if esplib.friends.enabled then
-        if is_friend(instance) then
-            base_color = esplib.friends.friend_color
-        else
-            base_color = esplib.friends.enemy_color
-        end
-    end
-    
-    -- Visibility override
+    -- Only visibility check changes ESP color
     if esplib.visibility.enabled then
         if is_visible(instance) then
             base_color = esplib.visibility.visible_color
@@ -314,8 +305,18 @@ function espfunctions.add_name(instance)
     text.Font = 1
     text.Transparency = 1
     
+    local tag = Drawing.new("Text")
+    tag.Center = false
+    tag.Outline = true
+    tag.Font = 1
+    tag.Transparency = 1
+    tag.Visible = false
+    
     espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].name = text
+    espinstances[instance].name = {
+        text = text,
+        tag = tag,
+    }
 end
 
 function espfunctions.add_distance(instance)
@@ -368,7 +369,12 @@ run_service.RenderStepped:Connect(function()
                 data.healthbar.fill:Remove()
             end
             if data.name then
-                data.name:Remove()
+                if data.name.text then
+                    data.name.text:Remove()
+                end
+                if data.name.tag then
+                    data.name.tag:Remove()
+                end
             end
             if data.distance then
                 data.distance:Remove()
@@ -398,7 +404,12 @@ run_service.RenderStepped:Connect(function()
                 data.healthbar.fill.Visible = false
             end
             if data.name then
-                data.name.Visible = false
+                if data.name.text then
+                    data.name.text.Visible = false
+                end
+                if data.name.tag then
+                    data.name.tag.Visible = false
+                end
             end
             if data.distance then
                 data.distance.Visible = false
@@ -572,23 +583,31 @@ run_service.RenderStepped:Connect(function()
         
         if data.name then
             if esplib.name.enabled and onscreen then
-                local text = data.name
+                local name_obj = data.name
                 local center_x = (min.X + max.X) / 2
                 local y = min.Y - 15
                 
                 local name_str = instance.Name
+                local show_tag = false
+                local tag_str = ""
+                local tag_color = Color3.new(1, 1, 1)
+                
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
                     local player = players:GetPlayerFromCharacter(instance)
                     if player then
                         name_str = player.Name
                         
-                        -- Add friend/enemy tags
+                        -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                name_str = "[F] " .. name_str
+                                tag_str = "[F] "
+                                tag_color = esplib.friends.friend_color -- green
+                                show_tag = true
                             else
-                                name_str = "[E] " .. name_str
+                                tag_str = "[E] "
+                                tag_color = esplib.friends.enemy_color -- red
+                                show_tag = true
                             end
                         end
                     end
@@ -600,14 +619,32 @@ run_service.RenderStepped:Connect(function()
                     end
                 end
                 
-                text.Text = name_str
-                text.Size = esplib.name.size
-                text.Color = esp_color
-                text.Transparency = transparency
-                text.Position = Vector2.new(center_x, y)
-                text.Visible = true
+                -- Show tag if needed
+                if show_tag then
+                    name_obj.tag.Text = tag_str
+                    name_obj.tag.Size = esplib.name.size
+                    name_obj.tag.Color = tag_color
+                    name_obj.tag.Transparency = transparency
+                    name_obj.tag.Position = Vector2.new(center_x - 20, y) -- offset to left
+                    name_obj.tag.Visible = true
+                else
+                    name_obj.tag.Visible = false
+                end
+                
+                -- Show name (always white)
+                name_obj.text.Text = name_str
+                name_obj.text.Size = esplib.name.size
+                name_obj.text.Color = esplib.name.fill
+                name_obj.text.Transparency = transparency
+                name_obj.text.Position = Vector2.new(center_x, y)
+                name_obj.text.Visible = true
             else
-                data.name.Visible = false
+                if data.name.text then
+                    data.name.text.Visible = false
+                end
+                if data.name.tag then
+                    data.name.tag.Visible = false
+                end
             end
         end
         
