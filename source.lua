@@ -68,6 +68,17 @@ if not esplib then
             show_tags = false, -- show [F]/[E] tags
             friends_list = {}, -- {"FriendName1", "FriendName2"}
         },
+        glow = {
+            enabled = false, -- glow effect
+            intensity = 0.3, -- glow intensity (0-1)
+            size = 2, -- glow size in pixels
+        },
+        animations = {
+            enabled = true, -- smooth animations
+            speed = 0.15, -- animation speed
+            health_smooth = true, -- smooth health bar changes
+            fade_in = true, -- fade in when ESP appears
+        },
     }
     getgenv().esplib = esplib
 end
@@ -82,10 +93,14 @@ esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transpare
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
+esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2}
+esplib.animations = esplib.animations or {enabled = true, speed = 0.15, health_smooth = true, fade_in = true}
 
 local espinstances = {}
 local espfunctions = {}
 local hover_targets = {} -- store hover animation data
+local animation_data = {} -- store animation states
+local health_animations = {} -- store health animation data
 
 -- Cleanup function to reset ESP when leaving game
 local function cleanup_esp()
@@ -374,10 +389,19 @@ function espfunctions.add_box(instance)
     fill.Transparency = 1
     fill.Visible = false
     
+    -- Glow objects
+    local glow_outline = Drawing.new("Square")
+    glow_outline.Filled = false
+    glow_outline.Transparency = 1
+    glow_outline.Visible = false
+    glow_outline.Thickness = 3
+    
     box.outline = outline
     box.fill = fill
+    box.glow_outline = glow_outline
     box.corner_fill = {}
     box.corner_outline = {}
+    box.corner_glow = {}
     
     for i = 1, 8 do
         local outline = Drawing.new("Line")
@@ -390,20 +414,38 @@ function espfunctions.add_box(instance)
         fill.Transparency = 1
         fill.Visible = false
         
+        local glow = Drawing.new("Line")
+        glow.Thickness = 4
+        glow.Transparency = 1
+        glow.Visible = false
+        
         table.insert(box.corner_fill, fill)
         table.insert(box.corner_outline, outline)
+        table.insert(box.corner_glow, glow)
     end
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].box = box
     
+    -- Initialize animation data
+    if esplib.animations.enabled then
+        animation_data[instance] = {
+            alpha = esplib.animations.fade_in and 0 or 1,
+            target_alpha = 1,
+        }
+    end
+    
     -- Force hide everything initially
     box.outline.Visible = false
     box.fill.Visible = false
+    box.glow_outline.Visible = false
     for _, line in ipairs(box.corner_fill) do
         line.Visible = false
     end
     for _, line in ipairs(box.corner_outline) do
+        line.Visible = false
+    end
+    for _, line in ipairs(box.corner_glow) do
         line.Visible = false
     end
 end
@@ -507,6 +549,65 @@ function espfunctions.add_tracer(instance)
         outline = outline,
         fill = fill,
     }
+end
+
+-- Animation helper function
+local function update_animations(instance, base_transparency)
+    if not esplib.animations.enabled then
+        return base_transparency
+    end
+    
+    if not animation_data[instance] then
+        animation_data[instance] = {
+            alpha = esplib.animations.fade_in and 0 or 1,
+            target_alpha = 1,
+        }
+    end
+    
+    local anim = animation_data[instance]
+    
+    -- Smooth fade in/out
+    if anim.alpha ~= anim.target_alpha then
+        local diff = anim.target_alpha - anim.alpha
+        anim.alpha = anim.alpha + (diff * esplib.animations.speed)
+        
+        -- Snap to target if close enough
+        if math.abs(diff) < 0.01 then
+            anim.alpha = anim.target_alpha
+        end
+    end
+    
+    return base_transparency * anim.alpha
+end
+
+-- Health animation helper
+local function update_health_animation(instance, current_health, max_health)
+    if not esplib.animations.health_smooth then
+        return current_health / max_health
+    end
+    
+    if not health_animations[instance] then
+        health_animations[instance] = {
+            displayed_health = current_health,
+            target_health = current_health,
+        }
+    end
+    
+    local health_anim = health_animations[instance]
+    health_anim.target_health = current_health
+    
+    -- Smooth health changes
+    if health_anim.displayed_health ~= health_anim.target_health then
+        local diff = health_anim.target_health - health_anim.displayed_health
+        health_anim.displayed_health = health_anim.displayed_health + (diff * esplib.animations.speed * 2) -- faster for health
+        
+        -- Snap if close
+        if math.abs(diff) < 0.5 then
+            health_anim.displayed_health = health_anim.target_health
+        end
+    end
+    
+    return math.clamp(health_anim.displayed_health / max_health, 0, 1)
 end
 
 -- // main thread
