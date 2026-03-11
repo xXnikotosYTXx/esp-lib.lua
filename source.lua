@@ -515,6 +515,11 @@ run_service.RenderStepped:Connect(function()
                 
                 to_pos = (min + max) / 2
                 
+                -- If box is enabled, attach tracer to bottom center of box
+                if esplib.box.enabled then
+                    to_pos = Vector2.new((min.X + max.X) / 2, max.Y)
+                end
+                
                 outline.From = from_pos
                 outline.To = to_pos
                 outline.Color = esplib.tracer.outline
