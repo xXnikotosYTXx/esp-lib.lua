@@ -344,8 +344,8 @@ local function get_bounding_box(instance)
         local center_y = (min.Y + max.Y) / 2
         
         -- Минимальные размеры для дальних дистанций
-        local min_width = 20
-        local min_height = 30
+        local min_width = 18  -- уменьшил на 2 пикселя
+        local min_height = 28 -- уменьшил на 2 пикселя
         
         -- Применяем минимальные размеры
         width = math.max(width, min_width)
@@ -730,11 +730,12 @@ run_service.RenderStepped:Connect(function()
                 fill.Visible = false
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
+                if humanoid and humanoid.MaxHealth > 0 then
                     local height = max.Y - min.Y
                     local width = max.X - min.X
                     local padding = 1
-                    local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                    local current_health = math.max(humanoid.Health, 0) -- защита от отрицательных значений
+                    local health = math.clamp(current_health / humanoid.MaxHealth, 0, 1)
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
@@ -785,7 +786,7 @@ run_service.RenderStepped:Connect(function()
                     outline.Transparency = 1
                     outline.Visible = true
                     
-                    if esplib.healthbar.gradient and health > 0 then
+                    if esplib.healthbar.gradient and health >= 0 then -- показывать даже при 0 HP
                         local low = esplib.healthbar.low_color
                         local high = esplib.healthbar.high_color
                         fill.Color = Color3.new(
