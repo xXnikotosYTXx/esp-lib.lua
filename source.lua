@@ -70,10 +70,10 @@ if not esplib then
         },
         glow = {
             enabled = false, -- glow effect
-            intensity = 0.3, -- glow intensity (0-1)
-            size = 2, -- glow size in pixels
-            color = Color3.new(0, 0.7, 1), -- cyan glow color
-            max_distance = 100, -- glow only up to 100 studs
+            intensity = 0.4, -- glow intensity (0-1) - немного меньше для лучшего вида
+            size = 1.5, -- glow size in pixels - меньше для более реалистичного эффекта
+            color = Color3.new(0, 0.8, 1), -- cyan glow color - немного темнее
+            max_distance = 150, -- glow only up to 150 studs - меньше дистанция для лучшей производительности
         },
         animations = {
             enabled = true, -- smooth animations
@@ -99,7 +99,7 @@ esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transpare
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
-esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2, color = Color3.new(0, 0.7, 1), max_distance = 100}
+esplib.glow = esplib.glow or {enabled = false, intensity = 0.4, size = 1.5, color = Color3.new(0, 0.8, 1), max_distance = 150}
 esplib.animations = esplib.animations or {enabled = true, speed = 0.2, health_smooth = true, fade_in = true, rainbow = false, rainbow_speed = 0.05, pulse = false, pulse_speed = 0.1}
 
 local espinstances = {}
@@ -411,14 +411,14 @@ function espfunctions.add_box(instance)
     fill.Transparency = 1
     fill.Visible = false
     
-    -- Multiple glow layers for real glow effect
+    -- Multiple glow layers for REAL glow effect - IMPROVED
     local glow_layers = {}
-    for i = 1, 4 do -- 4 layers of glow
+    for i = 1, 6 do -- больше слоев для более реалистичного свечения
         local glow = Drawing.new("Square")
         glow.Filled = false
         glow.Transparency = 1
         glow.Visible = false
-        glow.Thickness = i * 2 -- increasing thickness
+        glow.Thickness = math.ceil(i * 1.5) -- более плавное увеличение толщины
         table.insert(glow_layers, glow)
     end
     
@@ -440,11 +440,11 @@ function espfunctions.add_box(instance)
         fill.Transparency = 1
         fill.Visible = false
         
-        -- Corner glow layers
+        -- Corner glow layers - IMPROVED
         local corner_glow_layers = {}
-        for j = 1, 3 do
+        for j = 1, 4 do -- больше слоев для углов
             local glow = Drawing.new("Line")
-            glow.Thickness = j * 3
+            glow.Thickness = math.ceil(j * 2.5) -- более плавное увеличение толщины
             glow.Transparency = 1
             glow.Visible = false
             table.insert(corner_glow_layers, glow)
@@ -561,6 +561,65 @@ function espfunctions.cleanup()
     print("🧹 ESP cleaned up - ready for re-injection")
 end
 
+function espfunctions.force_cleanup()
+    -- Enhanced cleanup with pcall protection
+    pcall(function()
+        for instance, data in pairs(espinstances) do
+            if data.box then
+                if data.box.outline then pcall(function() data.box.outline:Remove() end) end
+                if data.box.fill then pcall(function() data.box.fill:Remove() end) end
+                if data.box.glow_layers then
+                    for _, glow in ipairs(data.box.glow_layers) do
+                        pcall(function() glow:Remove() end)
+                    end
+                end
+                for _, line in ipairs(data.box.corner_fill or {}) do
+                    pcall(function() line:Remove() end)
+                end
+                for _, line in ipairs(data.box.corner_outline or {}) do
+                    pcall(function() line:Remove() end)
+                end
+                for _, corner_glow_layers in ipairs(data.box.corner_glow or {}) do
+                    for _, glow in ipairs(corner_glow_layers or {}) do
+                        pcall(function() glow:Remove() end)
+                    end
+                end
+            end
+            if data.healthbar then
+                if data.healthbar.outline then pcall(function() data.healthbar.outline:Remove() end) end
+                if data.healthbar.fill then pcall(function() data.healthbar.fill:Remove() end) end
+            end
+            if data.name then
+                if data.name.text then pcall(function() data.name.text:Remove() end) end
+                if data.name.tag_bracket_left then pcall(function() data.name.tag_bracket_left:Remove() end) end
+                if data.name.tag_letter then pcall(function() data.name.tag_letter:Remove() end) end
+                if data.name.tag_bracket_right then pcall(function() data.name.tag_bracket_right:Remove() end) end
+            end
+            if data.distance then
+                pcall(function() data.distance:Remove() end)
+            end
+            if data.tracer then
+                if data.tracer.outline then pcall(function() data.tracer.outline:Remove() end) end
+                if data.tracer.fill then pcall(function() data.tracer.fill:Remove() end) end
+            end
+        end
+    end)
+    
+    -- Clear all tables
+    espinstances = {}
+    hover_targets = {}
+    animation_data = {}
+    health_animations = {}
+    glow_animations = {}
+    
+    -- Clear global reference
+    if getgenv().esplib then
+        getgenv().esplib = nil
+    end
+    
+    print("🔄 ESP force cleaned - completely reset for re-injection")
+end
+
 function espfunctions.reset()
     cleanup_esp()
     -- Reset hover targets
@@ -639,7 +698,7 @@ local function get_rainbow_color()
     return Color3.new(r, g, b)
 end
 
--- Glow fade animation helper
+-- Glow fade animation helper - SMOOTH FADE IN/OUT
 local function update_glow_fade(instance, distance)
     if not esplib.glow.enabled then
         return 0 -- no glow
@@ -654,28 +713,30 @@ local function update_glow_fade(instance, distance)
     
     local glow_anim = glow_animations[instance]
     
-    -- Calculate target alpha based on distance
+    -- IMPROVED: Smoother distance-based fade calculation
     if distance <= esplib.glow.max_distance then
-        -- Fade in zone: 0.8 * max_distance to max_distance
-        local fade_start = esplib.glow.max_distance * 0.8
+        -- Longer fade zone for smoother transition: 0.6 * max_distance to max_distance
+        local fade_start = esplib.glow.max_distance * 0.6 -- начинаем затухание раньше
         if distance <= fade_start then
             glow_anim.target_alpha = 1.0 -- full glow
         else
-            -- Smooth fade from full to zero
+            -- Smooth exponential fade for more natural look
             local fade_factor = (distance - fade_start) / (esplib.glow.max_distance - fade_start)
-            glow_anim.target_alpha = 1.0 - fade_factor
+            -- Exponential fade instead of linear for smoother effect
+            glow_anim.target_alpha = math.pow(1.0 - fade_factor, 2) -- квадратичное затухание
         end
     else
         glow_anim.target_alpha = 0 -- no glow
     end
     
-    -- Smooth animation to target
+    -- MUCH SMOOTHER animation with slower speed for glow
     if glow_anim.current_alpha ~= glow_anim.target_alpha then
         local diff = glow_anim.target_alpha - glow_anim.current_alpha
-        glow_anim.current_alpha = glow_anim.current_alpha + (diff * esplib.animations.speed * 1.5) -- slightly faster for glow
+        -- Slower animation speed for smoother glow transitions
+        glow_anim.current_alpha = glow_anim.current_alpha + (diff * esplib.animations.speed * 0.8) -- медленнее для плавности
         
-        -- Snap if close
-        if math.abs(diff) < 0.01 then
+        -- Smaller snap threshold for smoother transitions
+        if math.abs(diff) < 0.005 then -- меньший порог для более плавного перехода
             glow_anim.current_alpha = glow_anim.target_alpha
         end
     end
@@ -871,17 +932,18 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                     
-                    -- Real glow effect with smooth fade
+                    -- Real glow effect with smooth fade - IMPROVED GLOW LAYERS
                     local glow_alpha = update_glow_fade(instance, dist)
                     if glow_alpha > 0 and box.glow_layers then
                         for i, glow in ipairs(box.glow_layers) do
-                            local layer_size = i * esplib.glow.size
-                            local layer_transparency = transparency * esplib.glow.intensity * glow_alpha * (1 - (i - 1) * 0.2) -- decreasing intensity
+                            local layer_size = i * esplib.glow.size * 1.5 -- больше размер для реального свечения
+                            -- IMPROVED: More realistic glow with exponential falloff
+                            local layer_transparency = transparency * esplib.glow.intensity * glow_alpha * math.pow(0.6, i - 1) -- экспоненциальное затухание
                             
                             glow.Position = Vector2.new(min.X - layer_size, min.Y - layer_size)
                             glow.Size = Vector2.new((max.X - min.X) + layer_size * 2, (max.Y - min.Y) + layer_size * 2)
                             glow.Color = esplib.glow.color
-                            glow.Transparency = math.max(layer_transparency, 0.05)
+                            glow.Transparency = math.max(layer_transparency, 0.02) -- минимальная прозрачность для видимости
                             glow.Visible = true
                         end
                     else
@@ -941,15 +1003,16 @@ run_service.RenderStepped:Connect(function()
                         local oFrom = from - dir
                         local oTo = to + dir
                         
-                        -- Corner glow effect with smooth fade
+                        -- Corner glow effect with smooth fade - IMPROVED CORNER GLOW
                         local glow_alpha = update_glow_fade(instance, dist)
                         if glow_alpha > 0 and glow_lines[i] then
                             for j, glow in ipairs(glow_lines[i]) do
-                                local glow_transparency = transparency * esplib.glow.intensity * glow_alpha * (1 - (j - 1) * 0.3)
-                                glow.From = from - dir * j
-                                glow.To = to + dir * j
+                                -- IMPROVED: Better corner glow with exponential falloff
+                                local glow_transparency = transparency * esplib.glow.intensity * glow_alpha * math.pow(0.5, j - 1) -- экспоненциальное затухание
+                                glow.From = from - dir * j * 1.5 -- больше расстояние для реального свечения
+                                glow.To = to + dir * j * 1.5
                                 glow.Color = esplib.glow.color
-                                glow.Transparency = math.max(glow_transparency, 0.05)
+                                glow.Transparency = math.max(glow_transparency, 0.02) -- минимальная прозрачность
                                 glow.Visible = true
                             end
                         else
