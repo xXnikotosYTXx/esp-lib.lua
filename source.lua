@@ -652,15 +652,15 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- Position tag to the left of name with proper spacing
-                    local tag_start_x = center_x - 40 -- fixed distance to the left
+                    -- Position tag FAR to the left, independent of name
+                    local tag_x = min.X - 80 -- much further left
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
                     name_obj.tag_bracket_left.Size = esplib.name.size
                     name_obj.tag_bracket_left.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_left.Transparency = transparency
-                    name_obj.tag_bracket_left.Position = Vector2.new(tag_start_x, y)
+                    name_obj.tag_bracket_left.Position = Vector2.new(tag_x, y)
                     name_obj.tag_bracket_left.Visible = true
                     
                     -- Colored letter E/F
@@ -668,7 +668,7 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_letter.Size = esplib.name.size
                     name_obj.tag_letter.Color = tag_color -- red E or green F
                     name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(tag_start_x + 8, y)
+                    name_obj.tag_letter.Position = Vector2.new(tag_x + 8, y)
                     name_obj.tag_letter.Visible = true
                     
                     -- White right bracket ]
@@ -676,17 +676,16 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_bracket_right.Size = esplib.name.size
                     name_obj.tag_bracket_right.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_right.Transparency = transparency
-                    name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
+                    name_obj.tag_bracket_right.Position = Vector2.new(tag_x + 16, y)
                     name_obj.tag_bracket_right.Visible = true
-                    
-                    -- Keep name centered
-                    name_obj.text.Position = Vector2.new(center_x, y)
                 else
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
                     name_obj.tag_bracket_right.Visible = false
-                    name_obj.text.Position = Vector2.new(center_x, y)
                 end
+                
+                -- Name stays centered regardless of tag
+                name_obj.text.Position = Vector2.new(center_x, y)
                 
                 -- Show name (always white)
                 name_obj.text.Text = name_str
