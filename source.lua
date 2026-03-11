@@ -397,16 +397,20 @@ function espfunctions.add_box(instance)
     fill.Transparency = 1
     fill.Visible = false
     
-    -- Glow objects
-    local glow_outline = Drawing.new("Square")
-    glow_outline.Filled = false
-    glow_outline.Transparency = 1
-    glow_outline.Visible = false
-    glow_outline.Thickness = 3
+    -- Multiple glow layers for real glow effect
+    local glow_layers = {}
+    for i = 1, 4 do -- 4 layers of glow
+        local glow = Drawing.new("Square")
+        glow.Filled = false
+        glow.Transparency = 1
+        glow.Visible = false
+        glow.Thickness = i * 2 -- increasing thickness
+        table.insert(glow_layers, glow)
+    end
     
     box.outline = outline
     box.fill = fill
-    box.glow_outline = glow_outline
+    box.glow_layers = glow_layers
     box.corner_fill = {}
     box.corner_outline = {}
     box.corner_glow = {}
@@ -422,14 +426,19 @@ function espfunctions.add_box(instance)
         fill.Transparency = 1
         fill.Visible = false
         
-        local glow = Drawing.new("Line")
-        glow.Thickness = 4
-        glow.Transparency = 1
-        glow.Visible = false
+        -- Corner glow layers
+        local corner_glow_layers = {}
+        for j = 1, 3 do
+            local glow = Drawing.new("Line")
+            glow.Thickness = j * 3
+            glow.Transparency = 1
+            glow.Visible = false
+            table.insert(corner_glow_layers, glow)
+        end
         
         table.insert(box.corner_fill, fill)
         table.insert(box.corner_outline, outline)
-        table.insert(box.corner_glow, glow)
+        table.insert(box.corner_glow, corner_glow_layers)
     end
     
     espinstances[instance] = espinstances[instance] or {}
@@ -446,15 +455,19 @@ function espfunctions.add_box(instance)
     -- Force hide everything initially
     box.outline.Visible = false
     box.fill.Visible = false
-    box.glow_outline.Visible = false
+    for _, glow in ipairs(box.glow_layers) do
+        glow.Visible = false
+    end
     for _, line in ipairs(box.corner_fill) do
         line.Visible = false
     end
     for _, line in ipairs(box.corner_outline) do
         line.Visible = false
     end
-    for _, line in ipairs(box.corner_glow) do
-        line.Visible = false
+    for _, corner_glow_layers in ipairs(box.corner_glow) do
+        for _, glow in ipairs(corner_glow_layers) do
+            glow.Visible = false
+        end
     end
 end
 
@@ -794,16 +807,23 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                     
-                    -- Show glow effect first (behind main box) - ONLY on close distance
-                    if esplib.glow.enabled and box.glow_outline and dist <= esplib.glow.max_distance then
-                        box.glow_outline.Position = Vector2.new(min.X - esplib.glow.size, min.Y - esplib.glow.size)
-                        box.glow_outline.Size = Vector2.new((max.X - min.X) + esplib.glow.size * 2, (max.Y - min.Y) + esplib.glow.size * 2)
-                        box.glow_outline.Color = esplib.glow.color
-                        box.glow_outline.Transparency = transparency * esplib.glow.intensity
-                        box.glow_outline.Visible = true
+                    -- Real glow effect with multiple layers - ONLY on close distance
+                    if esplib.glow.enabled and box.glow_layers and dist <= esplib.glow.max_distance then
+                        for i, glow in ipairs(box.glow_layers) do
+                            local layer_size = i * esplib.glow.size
+                            local layer_transparency = transparency * esplib.glow.intensity * (1 - (i - 1) * 0.2) -- decreasing intensity
+                            
+                            glow.Position = Vector2.new(min.X - layer_size, min.Y - layer_size)
+                            glow.Size = Vector2.new((max.X - min.X) + layer_size * 2, (max.Y - min.Y) + layer_size * 2)
+                            glow.Color = esplib.glow.color
+                            glow.Transparency = math.max(layer_transparency, 0.1)
+                            glow.Visible = true
+                        end
                     else
-                        if box.glow_outline then
-                            box.glow_outline.Visible = false
+                        if box.glow_layers then
+                            for _, glow in ipairs(box.glow_layers) do
+                                glow.Visible = false
+                            end
                         end
                     end
                     
@@ -824,13 +844,19 @@ run_service.RenderStepped:Connect(function()
                     box.fill.Visible = true
                     
                 elseif esplib.box.type == "corner" then
-                    -- Hide normal box first
+                    -- Hide normal box and glow first
                     box.outline.Visible = false
                     box.fill.Visible = false
+                    if box.glow_layers then
+                        for _, glow in ipairs(box.glow_layers) do
+                            glow.Visible = false
+                        end
+                    end
                     
                     local fill_lines = box.corner_fill
                     local outline_lines = box.corner_outline
-                    local fill_color = esp_color
+                    local glow_lines = box.corner_glow
+                    local fill_color = get_rainbow_color() or esp_color -- анимированный цвет
                     local outline_color = esplib.box.outline
                     
                     local corners = {
@@ -849,6 +875,24 @@ run_service.RenderStepped:Connect(function()
                         local dir = (to - from).Unit
                         local oFrom = from - dir
                         local oTo = to + dir
+                        
+                        -- Corner glow effect
+                        if esplib.glow.enabled and glow_lines[i] and dist <= esplib.glow.max_distance then
+                            for j, glow in ipairs(glow_lines[i]) do
+                                local glow_transparency = transparency * esplib.glow.intensity * (1 - (j - 1) * 0.3)
+                                glow.From = from - dir * j
+                                glow.To = to + dir * j
+                                glow.Color = esplib.glow.color
+                                glow.Transparency = math.max(glow_transparency, 0.1)
+                                glow.Visible = true
+                            end
+                        else
+                            if glow_lines[i] then
+                                for _, glow in ipairs(glow_lines[i]) do
+                                    glow.Visible = false
+                                end
+                            end
+                        end
                         
                         local o = outline_lines[i]
                         o.From = oFrom
@@ -869,11 +913,21 @@ run_service.RenderStepped:Connect(function()
                 -- Hide EVERYTHING when box is disabled
                 box.outline.Visible = false
                 box.fill.Visible = false
+                if box.glow_layers then
+                    for _, glow in ipairs(box.glow_layers) do
+                        glow.Visible = false
+                    end
+                end
                 for _, line in ipairs(box.corner_fill) do
                     line.Visible = false
                 end
                 for _, line in ipairs(box.corner_outline) do
                     line.Visible = false
+                end
+                for _, corner_glow_layers in ipairs(box.corner_glow) do
+                    for _, glow in ipairs(corner_glow_layers) do
+                        glow.Visible = false
+                    end
                 end
             end
         end
