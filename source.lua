@@ -115,31 +115,41 @@ local pulse_time = 0 -- for pulse animation
 local function cleanup_esp()
     for instance, data in pairs(espinstances) do
         if data.box then
-            if data.box.outline then data.box.outline:Remove() end
-            if data.box.fill then data.box.fill:Remove() end
+            if data.box.outline then pcall(function() data.box.outline:Remove() end) end
+            if data.box.fill then pcall(function() data.box.fill:Remove() end) end
+            if data.box.glow_layers then
+                for _, glow in ipairs(data.box.glow_layers) do
+                    pcall(function() glow:Remove() end)
+                end
+            end
             for _, line in ipairs(data.box.corner_fill or {}) do
-                if line then line:Remove() end
+                pcall(function() line:Remove() end)
             end
             for _, line in ipairs(data.box.corner_outline or {}) do
-                if line then line:Remove() end
+                pcall(function() line:Remove() end)
+            end
+            for _, corner_glow_layers in ipairs(data.box.corner_glow or {}) do
+                for _, glow in ipairs(corner_glow_layers or {}) do
+                    pcall(function() glow:Remove() end)
+                end
             end
         end
         if data.healthbar then
-            if data.healthbar.outline then data.healthbar.outline:Remove() end
-            if data.healthbar.fill then data.healthbar.fill:Remove() end
+            if data.healthbar.outline then pcall(function() data.healthbar.outline:Remove() end) end
+            if data.healthbar.fill then pcall(function() data.healthbar.fill:Remove() end) end
         end
         if data.name then
-            if data.name.text then data.name.text:Remove() end
-            if data.name.tag_bracket_left then data.name.tag_bracket_left:Remove() end
-            if data.name.tag_letter then data.name.tag_letter:Remove() end
-            if data.name.tag_bracket_right then data.name.tag_bracket_right:Remove() end
+            if data.name.text then pcall(function() data.name.text:Remove() end) end
+            if data.name.tag_bracket_left then pcall(function() data.name.tag_bracket_left:Remove() end) end
+            if data.name.tag_letter then pcall(function() data.name.tag_letter:Remove() end) end
+            if data.name.tag_bracket_right then pcall(function() data.name.tag_bracket_right:Remove() end) end
         end
         if data.distance then
-            data.distance:Remove()
+            pcall(function() data.distance:Remove() end)
         end
         if data.tracer then
-            if data.tracer.outline then data.tracer.outline:Remove() end
-            if data.tracer.fill then data.tracer.fill:Remove() end
+            if data.tracer.outline then pcall(function() data.tracer.outline:Remove() end) end
+            if data.tracer.fill then pcall(function() data.tracer.fill:Remove() end) end
         end
     end
     
@@ -681,10 +691,18 @@ local function update_health_animation(instance, current_health, max_health)
         health_animations[instance] = {
             displayed_health = current_health,
             target_health = current_health,
+            last_max_health = max_health,
         }
     end
     
     local health_anim = health_animations[instance]
+    
+    -- Reset animation if max health changed (respawn detection)
+    if health_anim.last_max_health ~= max_health then
+        health_anim.displayed_health = current_health
+        health_anim.last_max_health = max_health
+    end
+    
     health_anim.target_health = current_health
     
     -- Smooth health changes
