@@ -388,8 +388,14 @@ run_service.RenderStepped:Connect(function()
                 if data.name.text then
                     data.name.text:Remove()
                 end
-                if data.name.tag then
-                    data.name.tag:Remove()
+                if data.name.tag_bracket_left then
+                    data.name.tag_bracket_left:Remove()
+                end
+                if data.name.tag_letter then
+                    data.name.tag_letter:Remove()
+                end
+                if data.name.tag_bracket_right then
+                    data.name.tag_bracket_right:Remove()
                 end
             end
             if data.distance then
@@ -423,8 +429,14 @@ run_service.RenderStepped:Connect(function()
                 if data.name.text then
                     data.name.text.Visible = false
                 end
-                if data.name.tag then
-                    data.name.tag.Visible = false
+                if data.name.tag_bracket_left then
+                    data.name.tag_bracket_left.Visible = false
+                end
+                if data.name.tag_letter then
+                    data.name.tag_letter.Visible = false
+                end
+                if data.name.tag_bracket_right then
+                    data.name.tag_bracket_right.Visible = false
                 end
             end
             if data.distance then
@@ -606,7 +618,7 @@ run_service.RenderStepped:Connect(function()
                 local name_str = instance.Name
                 local show_tag = false
                 local tag_color = Color3.new(1, 1, 1)
-                local is_friend_tag = false
+                local tag_letter = ""
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -618,11 +630,11 @@ run_service.RenderStepped:Connect(function()
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
                                 show_tag = true
-                                is_friend_tag = true
+                                tag_letter = "F"
                                 tag_color = esplib.friends.friend_color -- green F
                             else
                                 show_tag = true
-                                is_friend_tag = false
+                                tag_letter = "E"
                                 tag_color = esplib.friends.enemy_color -- red E
                             end
                         end
@@ -635,28 +647,45 @@ run_service.RenderStepped:Connect(function()
                     end
                 end
                 
-                -- Show colored tag if needed
+                -- Show tag parts if needed
                 if show_tag then
-                    name_obj.tag.Text = is_friend_tag and "[F]" or "[E]"
-                    name_obj.tag.Size = esplib.name.size
-                    name_obj.tag.Color = tag_color
-                    name_obj.tag.Transparency = transparency
+                    local tag_start_x = center_x - 35 -- start position for tag
                     
-                    -- Calculate tag width for positioning
-                    local tag_width = 25 -- approximate width of [E] or [F]
-                    name_obj.tag.Position = Vector2.new(center_x - tag_width, y)
-                    name_obj.tag.Visible = true
+                    -- White left bracket [
+                    name_obj.tag_bracket_left.Text = "["
+                    name_obj.tag_bracket_left.Size = esplib.name.size
+                    name_obj.tag_bracket_left.Color = Color3.new(1, 1, 1) -- white
+                    name_obj.tag_bracket_left.Transparency = transparency
+                    name_obj.tag_bracket_left.Position = Vector2.new(tag_start_x, y)
+                    name_obj.tag_bracket_left.Visible = true
+                    
+                    -- Colored letter E/F
+                    name_obj.tag_letter.Text = tag_letter
+                    name_obj.tag_letter.Size = esplib.name.size
+                    name_obj.tag_letter.Color = tag_color -- red E or green F
+                    name_obj.tag_letter.Transparency = transparency
+                    name_obj.tag_letter.Position = Vector2.new(tag_start_x + 8, y)
+                    name_obj.tag_letter.Visible = true
+                    
+                    -- White right bracket ]
+                    name_obj.tag_bracket_right.Text = "]"
+                    name_obj.tag_bracket_right.Size = esplib.name.size
+                    name_obj.tag_bracket_right.Color = Color3.new(1, 1, 1) -- white
+                    name_obj.tag_bracket_right.Transparency = transparency
+                    name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
+                    name_obj.tag_bracket_right.Visible = true
                     
                     -- Position name after tag
-                    name_obj.text.Text = " " .. name_str -- space before name
                     name_obj.text.Position = Vector2.new(center_x - 5, y)
                 else
-                    name_obj.tag.Visible = false
-                    name_obj.text.Text = name_str
+                    name_obj.tag_bracket_left.Visible = false
+                    name_obj.tag_letter.Visible = false
+                    name_obj.tag_bracket_right.Visible = false
                     name_obj.text.Position = Vector2.new(center_x, y)
                 end
                 
                 -- Show name (always white)
+                name_obj.text.Text = name_str
                 name_obj.text.Size = esplib.name.size
                 name_obj.text.Color = esplib.name.fill
                 name_obj.text.Transparency = transparency
@@ -665,8 +694,14 @@ run_service.RenderStepped:Connect(function()
                 if data.name.text then
                     data.name.text.Visible = false
                 end
-                if data.name.tag then
-                    data.name.tag.Visible = false
+                if data.name.tag_bracket_left then
+                    data.name.tag_bracket_left.Visible = false
+                end
+                if data.name.tag_letter then
+                    data.name.tag_letter.Visible = false
+                end
+                if data.name.tag_bracket_right then
+                    data.name.tag_bracket_right.Visible = false
                 end
             end
         end
