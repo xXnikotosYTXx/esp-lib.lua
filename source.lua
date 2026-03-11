@@ -785,25 +785,19 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- ПРАВИЛЬНЫЙ расчет позиции тега - используем TextBounds для точной ширины
-                    name_obj.text.Text = name_str -- сначала устанавливаем текст
-                    name_obj.text.Size = esplib.name.size
+                    -- ПРОСТОЕ решение - фиксированная позиция тега относительно центра имени
+                    local tag_width = 24 -- ширина тега [E] примерно 24 пикселя
+                    local gap = 10 -- небольшой отступ между тегом и именем
                     
-                    -- Получаем реальную ширину текста (приблизительно)
-                    local text_service = game:GetService("TextService")
-                    local text_bounds = text_service:GetTextSize(name_str, esplib.name.size, Enum.Font.Legacy, Vector2.new(math.huge, math.huge))
-                    local actual_name_width = text_bounds.X
-                    
-                    -- Позиция тега - слева от начала имени с отступом
-                    local name_start_x = center_x - (actual_name_width / 2) -- левый край имени
-                    local tag_x = name_start_x - 15 -- отступ всего 15px от начала имени
+                    -- Позиция тега - слева от центра имени
+                    local tag_center_x = center_x - gap - (tag_width / 2)
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
                     name_obj.tag_bracket_left.Size = esplib.name.size
                     name_obj.tag_bracket_left.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_left.Transparency = transparency
-                    name_obj.tag_bracket_left.Position = Vector2.new(tag_x, y)
+                    name_obj.tag_bracket_left.Position = Vector2.new(tag_center_x - 12, y)
                     name_obj.tag_bracket_left.Visible = true
                     
                     -- Colored letter E/F
@@ -811,7 +805,7 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_letter.Size = esplib.name.size
                     name_obj.tag_letter.Color = tag_color -- red E or green F
                     name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(tag_x + 8, y)
+                    name_obj.tag_letter.Position = Vector2.new(tag_center_x - 4, y)
                     name_obj.tag_letter.Visible = true
                     
                     -- White right bracket ]
@@ -819,8 +813,12 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_bracket_right.Size = esplib.name.size
                     name_obj.tag_bracket_right.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_right.Transparency = transparency
-                    name_obj.tag_bracket_right.Position = Vector2.new(tag_x + 16, y)
+                    name_obj.tag_bracket_right.Position = Vector2.new(tag_center_x + 4, y)
                     name_obj.tag_bracket_right.Visible = true
+                    
+                    -- Устанавливаем текст имени
+                    name_obj.text.Text = name_str
+                    name_obj.text.Size = esplib.name.size
                 else
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
