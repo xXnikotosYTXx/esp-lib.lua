@@ -716,10 +716,18 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- More accurate calculation for name width and MUCH bigger gap
-                    local name_width = #name_str * 7.5 -- more accurate character width
-                    local name_start_x = center_x - (name_width / 2) -- left edge of name
-                    local tag_x = name_start_x - 60 -- MUCH BIGGER gap before name start
+                    -- ПРАВИЛЬНЫЙ расчет позиции тега - используем TextBounds для точной ширины
+                    name_obj.text.Text = name_str -- сначала устанавливаем текст
+                    name_obj.text.Size = esplib.name.size
+                    
+                    -- Получаем реальную ширину текста (приблизительно)
+                    local text_service = game:GetService("TextService")
+                    local text_bounds = text_service:GetTextSize(name_str, esplib.name.size, Enum.Font.Legacy, Vector2.new(math.huge, math.huge))
+                    local actual_name_width = text_bounds.X
+                    
+                    -- Позиция тега - слева от начала имени с отступом
+                    local name_start_x = center_x - (actual_name_width / 2) -- левый край имени
+                    local tag_x = name_start_x - 15 -- отступ всего 15px от начала имени
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
@@ -748,14 +756,16 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
                     name_obj.tag_bracket_right.Visible = false
+                    
+                    -- Устанавливаем текст и размер когда нет тега
+                    name_obj.text.Text = name_str
+                    name_obj.text.Size = esplib.name.size
                 end
                 
                 -- Name stays centered
                 name_obj.text.Position = Vector2.new(center_x, y)
                 
-                -- Show name (always white)
-                name_obj.text.Text = name_str
-                name_obj.text.Size = esplib.name.size
+                -- Show name (always white) - текст уже установлен выше
                 name_obj.text.Color = esplib.name.fill
                 name_obj.text.Transparency = transparency
                 name_obj.text.Visible = true
