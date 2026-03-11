@@ -183,6 +183,16 @@ function espfunctions.add_box(instance)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].box = box
+    
+    -- Force hide everything initially
+    box.outline.Visible = false
+    box.fill.Visible = false
+    for _, line in ipairs(box.corner_fill) do
+        line.Visible = false
+    end
+    for _, line in ipairs(box.corner_outline) do
+        line.Visible = false
+    end
 end
 
 function espfunctions.add_healthbar(instance)
