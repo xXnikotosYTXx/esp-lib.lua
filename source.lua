@@ -752,8 +752,7 @@ run_service.RenderStepped:Connect(function()
                 local y = min.Y - 15
                 
                 local name_str = instance.Name
-                local show_tag = false
-                local tag_letter = ""
+                local tag_str = ""
                 local health_str = ""
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
@@ -765,11 +764,9 @@ run_service.RenderStepped:Connect(function()
                         -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                show_tag = true
-                                tag_letter = "F"
+                                tag_str = " [F]" -- green F
                             else
-                                show_tag = true
-                                tag_letter = "E"
+                                tag_str = " [E]" -- red E
                             end
                         end
                     end
@@ -781,58 +778,16 @@ run_service.RenderStepped:Connect(function()
                     end
                 end
                 
-                -- Create final name string with health but WITHOUT tag
-                local final_name = name_str .. health_str
+                -- Combine: "PlayerName [100:100] [E]" - тег ПОСЛЕ хила
+                local full_text = name_str .. health_str .. tag_str
                 
-                -- Show tag with gradient effect if needed
-                if show_tag then
-                    -- Position tag right after the name
-                    local name_width = #name_str * 7 -- approximate width
-                    local tag_start_x = center_x + (name_width / 2) + 5 -- right after name with small gap
-                    
-                    -- Gradient colors based on friend/enemy
-                    local bracket_color, letter_color
-                    if tag_letter == "F" then
-                        -- Friend: cyan to green gradient
-                        bracket_color = Color3.new(0, 1, 1) -- cyan brackets
-                        letter_color = Color3.new(0, 1, 0.5) -- green-cyan letter
-                    else
-                        -- Enemy: red to purple gradient  
-                        bracket_color = Color3.new(1, 0, 0.5) -- red-purple brackets
-                        letter_color = Color3.new(0.8, 0, 0.8) -- purple letter
-                    end
-                    
-                    -- Left bracket [
-                    name_obj.tag_bracket_left.Text = "["
-                    name_obj.tag_bracket_left.Size = esplib.name.size
-                    name_obj.tag_bracket_left.Color = bracket_color
-                    name_obj.tag_bracket_left.Transparency = transparency
-                    name_obj.tag_bracket_left.Position = Vector2.new(tag_start_x, y)
-                    name_obj.tag_bracket_left.Visible = true
-                    
-                    -- Colored letter E/F
-                    name_obj.tag_letter.Text = tag_letter
-                    name_obj.tag_letter.Size = esplib.name.size
-                    name_obj.tag_letter.Color = letter_color
-                    name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(tag_start_x + 8, y)
-                    name_obj.tag_letter.Visible = true
-                    
-                    -- Right bracket ]
-                    name_obj.tag_bracket_right.Text = "]"
-                    name_obj.tag_bracket_right.Size = esplib.name.size
-                    name_obj.tag_bracket_right.Color = bracket_color
-                    name_obj.tag_bracket_right.Transparency = transparency
-                    name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
-                    name_obj.tag_bracket_right.Visible = true
-                else
-                    name_obj.tag_bracket_left.Visible = false
-                    name_obj.tag_letter.Visible = false
-                    name_obj.tag_bracket_right.Visible = false
-                end
+                -- Hide all separate tag objects
+                name_obj.tag_bracket_left.Visible = false
+                name_obj.tag_letter.Visible = false
+                name_obj.tag_bracket_right.Visible = false
                 
-                -- Show name and health (white)
-                name_obj.text.Text = final_name
+                -- Show combined text (all white for now)
+                name_obj.text.Text = full_text
                 name_obj.text.Size = esplib.name.size
                 
                 -- Name stays centered
