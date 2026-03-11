@@ -305,11 +305,11 @@ run_service.RenderStepped:Connect(function()
         end
         
         local transparency = 1
-        if esplib.fade.enabled then
-            if dist > esplib.fade.max_distance then
-                local fade_factor = math.clamp((dist - esplib.fade.max_distance) / esplib.fade.max_distance, 0, 1)
-                transparency = 1 - (fade_factor * (1 - esplib.fade.min_transparency))
-            end
+        if esplib.fade.enabled and dist <= esplib.fade.max_distance then
+            local fade_factor = math.clamp(dist / esplib.fade.max_distance, 0, 1)
+            transparency = 1 - (fade_factor * (1 - esplib.fade.min_transparency))
+        elseif esplib.fade.enabled and dist > esplib.fade.max_distance then
+            transparency = esplib.fade.min_transparency
         end
         
         if data.box then
@@ -398,13 +398,13 @@ run_service.RenderStepped:Connect(function()
                 fill.Visible = false
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid then
+                if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
                     local height = max.Y - min.Y
                     local padding = 1
                     local x = min.X - 3 - 1 - padding
                     local y = min.Y - padding
                     local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                    local fillheight = height * health
+                    local fillheight = math.max(height * health, 1) -- minimum 1 pixel height
                     
                     outline.Color = esplib.healthbar.outline
                     outline.Position = Vector2.new(x, y)
@@ -412,7 +412,7 @@ run_service.RenderStepped:Connect(function()
                     outline.Transparency = 1
                     outline.Visible = true
                     
-                    if esplib.healthbar.gradient then
+                    if esplib.healthbar.gradient and health > 0 then
                         local low = esplib.healthbar.low_color
                         local high = esplib.healthbar.high_color
                         fill.Color = Color3.new(
@@ -443,13 +443,13 @@ run_service.RenderStepped:Connect(function()
                 
                 local name_str = instance.Name
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid then
+                if humanoid and humanoid.Health > 0 then
                     local player = players:GetPlayerFromCharacter(instance)
                     if player then
                         name_str = player.Name
                     end
                     
-                    if esplib.name.show_health then
+                    if esplib.name.show_health and humanoid.MaxHealth > 0 then
                         local current_health = math.floor(humanoid.Health)
                         local max_health = math.floor(humanoid.MaxHealth)
                         name_str = name_str .. " [" .. current_health .. ":" .. max_health .. "]"
