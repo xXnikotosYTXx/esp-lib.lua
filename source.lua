@@ -41,6 +41,11 @@ if not esplib then
             outline = Color3.new(0,0,0),
             from = "mouse", -- mouse, head, top, bottom, center
         },
+        fade = {
+            enabled = false,
+            max_distance = 500,
+            min_transparency = 0.3,
+        },
     }
     getgenv().esplib = esplib
 end
@@ -50,6 +55,7 @@ esplib.healthbar.gradient = esplib.healthbar.gradient == nil and true or esplib.
 esplib.healthbar.low_color = esplib.healthbar.low_color or Color3.new(1,0,0)
 esplib.healthbar.high_color = esplib.healthbar.high_color or Color3.new(0,1,0)
 esplib.name.show_health = esplib.name.show_health == nil and false or esplib.name.show_health
+esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3}
 
 local espinstances = {}
 local espfunctions = {}
@@ -146,7 +152,7 @@ function espfunctions.add_box(instance)
     local box = {}
     
     local outline = Drawing.new("Square")
-    outline.Thickness = 3
+    outline.Thickness = 1
     outline.Filled = false
     outline.Transparency = 1
     outline.Visible = false
@@ -164,7 +170,7 @@ function espfunctions.add_box(instance)
     
     for i = 1, 8 do
         local outline = Drawing.new("Line")
-        outline.Thickness = 3
+        outline.Thickness = 2
         outline.Transparency = 1
         outline.Visible = false
         
@@ -230,7 +236,7 @@ function espfunctions.add_tracer(instance)
     if not instance or espinstances[instance] and espinstances[instance].tracer then return end
     
     local outline = Drawing.new("Line")
-    outline.Thickness = 3
+    outline.Thickness = 2
     outline.Transparency = 1
     
     local fill = Drawing.new("Line")
@@ -282,6 +288,30 @@ run_service.RenderStepped:Connect(function()
         
         local min, max, onscreen = get_bounding_box(instance)
         
+        local dist
+        if instance:IsA("Model") then
+            if instance.PrimaryPart then
+                dist = (camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
+            else
+                local part = instance:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    dist = (camera.CFrame.Position - part.Position).Magnitude
+                else
+                    dist = 999
+                end
+            end
+        else
+            dist = (camera.CFrame.Position - instance.Position).Magnitude
+        end
+        
+        local transparency = 1
+        if esplib.fade.enabled then
+            if dist > esplib.fade.max_distance then
+                local fade_factor = math.clamp((dist - esplib.fade.max_distance) / esplib.fade.max_distance, 0, 1)
+                transparency = 1 - (fade_factor * (1 - esplib.fade.min_transparency))
+            end
+        end
+        
         if data.box then
             local box = data.box
             if esplib.box.enabled and onscreen then
@@ -290,22 +320,24 @@ run_service.RenderStepped:Connect(function()
                 local len = math.min(w, h) * 0.25
                 
                 if esplib.box.type == "normal" then
-                    box.outline.Position = min
-                    box.outline.Size = max - min
-                    box.outline.Color = esplib.box.outline
-                    box.outline.Visible = true
-                    
-                    box.fill.Position = min
-                    box.fill.Size = max - min
-                    box.fill.Color = esplib.box.fill
-                    box.fill.Visible = true
-                    
                     for _, line in ipairs(box.corner_fill) do
                         line.Visible = false
                     end
                     for _, line in ipairs(box.corner_outline) do
                         line.Visible = false
                     end
+                    
+                    box.outline.Position = min
+                    box.outline.Size = max - min
+                    box.outline.Color = esplib.box.outline
+                    box.outline.Transparency = transparency
+                    box.outline.Visible = true
+                    
+                    box.fill.Position = min
+                    box.fill.Size = max - min
+                    box.fill.Color = esplib.box.fill
+                    box.fill.Transparency = transparency
+                    box.fill.Visible = true
                 elseif esplib.box.type == "corner" then
                     box.outline.Visible = false
                     box.fill.Visible = false
@@ -336,12 +368,14 @@ run_service.RenderStepped:Connect(function()
                         o.From = oFrom
                         o.To = oTo
                         o.Color = outline_color
+                        o.Transparency = transparency
                         o.Visible = true
                         
                         local f = fill_lines[i]
                         f.From = from
                         f.To = to
                         f.Color = fill_color
+                        f.Transparency = transparency
                         f.Visible = true
                     end
                 end
@@ -375,6 +409,7 @@ run_service.RenderStepped:Connect(function()
                     outline.Color = esplib.healthbar.outline
                     outline.Position = Vector2.new(x, y)
                     outline.Size = Vector2.new(1 + 2 * padding, height + 2 * padding)
+                    outline.Transparency = transparency
                     outline.Visible = true
                     
                     if esplib.healthbar.gradient then
@@ -391,6 +426,7 @@ run_service.RenderStepped:Connect(function()
                     
                     fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
                     fill.Size = Vector2.new(1, fillheight)
+                    fill.Transparency = transparency
                     fill.Visible = true
                 else
                     outline.Visible = false
@@ -423,6 +459,7 @@ run_service.RenderStepped:Connect(function()
                 text.Text = name_str
                 text.Size = esplib.name.size
                 text.Color = esplib.name.fill
+                text.Transparency = transparency
                 text.Position = Vector2.new(center_x, y)
                 text.Visible = true
             else
@@ -436,25 +473,10 @@ run_service.RenderStepped:Connect(function()
                 local center_x = (min.X + max.X) / 2
                 local y = max.Y + 5
                 
-                local dist
-                if instance:IsA("Model") then
-                    if instance.PrimaryPart then
-                        dist = (camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
-                    else
-                        local part = instance:FindFirstChildWhichIsA("BasePart")
-                        if part then
-                            dist = (camera.CFrame.Position - part.Position).Magnitude
-                        else
-                            dist = 999
-                        end
-                    end
-                else
-                    dist = (camera.CFrame.Position - instance.Position).Magnitude
-                end
-                
                 text.Text = tostring(math.floor(dist)) .. "m"
                 text.Size = esplib.distance.size
                 text.Color = esplib.distance.fill
+                text.Transparency = transparency
                 text.Position = Vector2.new(center_x, y)
                 text.Visible = true
             else
@@ -496,11 +518,13 @@ run_service.RenderStepped:Connect(function()
                 outline.From = from_pos
                 outline.To = to_pos
                 outline.Color = esplib.tracer.outline
+                outline.Transparency = transparency
                 outline.Visible = true
                 
                 fill.From = from_pos
                 fill.To = to_pos
                 fill.Color = esplib.tracer.fill
+                fill.Transparency = transparency
                 fill.Visible = true
             else
                 data.tracer.outline.Visible = false
