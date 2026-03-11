@@ -9,66 +9,75 @@ Enhanced version with gradient healthbar and health text display.
 -- // table
 local esplib = getgenv().esplib
 if not esplib then
-    esplib = {
-        box = {
-            enabled = true,
-            type = "normal", -- normal, corner
-            padding = 1.15,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-        },
-        healthbar = {
-            enabled = true,
-            fill = Color3.new(0,1,0),
-            outline = Color3.new(0,0,0),
-            gradient = true, -- gradient from red to green
-            low_color = Color3.new(1,0,0), -- red at low health
-            high_color = Color3.new(0,1,0), -- green at high health
-            width = 3, -- width of healthbar
-            offset = 5, -- distance from box
-        },
-        name = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-            show_health = false, -- show health next to name
-        },
-        distance = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-        },
-        tracer = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-            from = "mouse", -- mouse, head, top, bottom, center
-        },
-        chams = {
-            enabled = false,
-            fill_color = Color3.new(1, 0, 0),
-            fill_transparency = 0.5,
-            outline_color = Color3.new(1, 1, 1),
-            outline_transparency = 0,
-        },
-        team_check = {
-            enabled = false,
-            enemy_color = Color3.new(1, 0, 0), -- red for enemies
-            team_color = Color3.new(0, 1, 0), -- green for teammates
-        },
-        fade = {
-            enabled = false,
-            max_distance = 500, -- start fading after this distance
-            min_transparency = 0.3, -- minimum transparency at max distance
-        },
-        skeleton = {
-            enabled = false,
-            color = Color3.new(1, 1, 1),
-            thickness = 1,
-        },
-    }
+    esplib = {}
     getgenv().esplib = esplib
 end
+
+-- Set defaults only if not already set
+esplib.box = esplib.box or {
+    enabled = true,
+    type = "normal", -- normal, corner
+    padding = 1.15,
+    fill = Color3.new(1,1,1),
+    outline = Color3.new(0,0,0),
+}
+
+esplib.healthbar = esplib.healthbar or {
+    enabled = true,
+    fill = Color3.new(0,1,0),
+    outline = Color3.new(0,0,0),
+    gradient = true, -- gradient from red to green
+    low_color = Color3.new(1,0,0), -- red at low health
+    high_color = Color3.new(0,1,0), -- green at high health
+    width = 3, -- width of healthbar
+    offset = 5, -- distance from box
+}
+
+esplib.name = esplib.name or {
+    enabled = true,
+    fill = Color3.new(1,1,1),
+    size = 13,
+    show_health = false, -- show health next to name
+}
+
+esplib.distance = esplib.distance or {
+    enabled = true,
+    fill = Color3.new(1,1,1),
+    size = 13,
+}
+
+esplib.tracer = esplib.tracer or {
+    enabled = true,
+    fill = Color3.new(1,1,1),
+    outline = Color3.new(0,0,0),
+    from = "mouse", -- mouse, head, top, bottom, center
+}
+
+esplib.chams = esplib.chams or {
+    enabled = false,
+    fill_color = Color3.new(1, 0, 0),
+    fill_transparency = 0.5,
+    outline_color = Color3.new(1, 1, 1),
+    outline_transparency = 0,
+}
+
+esplib.team_check = esplib.team_check or {
+    enabled = false,
+    enemy_color = Color3.new(1, 0, 0), -- red for enemies
+    team_color = Color3.new(0, 1, 0), -- green for teammates
+}
+
+esplib.fade = esplib.fade or {
+    enabled = false,
+    max_distance = 500, -- start fading after this distance
+    min_transparency = 0.3, -- minimum transparency at max distance
+}
+
+esplib.skeleton = esplib.skeleton or {
+    enabled = false,
+    color = Color3.new(1, 1, 1),
+    thickness = 1,
+}
 
 local espinstances = {}
 local espfunctions = {}
