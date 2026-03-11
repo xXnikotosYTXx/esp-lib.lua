@@ -703,10 +703,10 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- Calculate where the name STARTS (left edge of name)
-                    local name_width = #name_str * 6 -- approximate character width
+                    -- More accurate calculation for name width and bigger gap
+                    local name_width = #name_str * 7.5 -- more accurate character width
                     local name_start_x = center_x - (name_width / 2) -- left edge of name
-                    local tag_x = name_start_x - 30 -- position tag BEFORE name start with gap
+                    local tag_x = name_start_x - 40 -- BIGGER gap before name start
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
