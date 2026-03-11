@@ -318,6 +318,7 @@ run_service.RenderStepped:Connect(function()
                 local len = math.min(w, h) * 0.25
                 
                 if esplib.box.type == "normal" then
+                    -- Hide ALL corner lines first
                     for _, line in ipairs(box.corner_fill) do
                         line.Visible = false
                     end
@@ -325,6 +326,7 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                     
+                    -- Show normal box
                     box.outline.Position = min
                     box.outline.Size = max - min
                     box.outline.Color = esplib.box.outline
@@ -336,7 +338,9 @@ run_service.RenderStepped:Connect(function()
                     box.fill.Color = esplib.box.fill
                     box.fill.Transparency = transparency
                     box.fill.Visible = true
+                    
                 elseif esplib.box.type == "corner" then
+                    -- Hide normal box first
                     box.outline.Visible = false
                     box.fill.Visible = false
                     
@@ -378,6 +382,7 @@ run_service.RenderStepped:Connect(function()
                     end
                 end
             else
+                -- Hide EVERYTHING when box is disabled
                 box.outline.Visible = false
                 box.fill.Visible = false
                 for _, line in ipairs(box.corner_fill) do
@@ -521,8 +526,8 @@ run_service.RenderStepped:Connect(function()
                 outline.From = from_pos
                 outline.To = to_pos
                 outline.Color = esplib.tracer.outline
-                outline.Transparency = 1
-                outline.Visible = true
+                outline.Transparency = 0 -- hide outline completely
+                outline.Visible = false
                 
                 fill.From = from_pos
                 fill.To = to_pos
