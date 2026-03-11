@@ -46,6 +46,22 @@ if not esplib then
             max_distance = 500,
             min_transparency = 0.3,
         },
+        visibility = {
+            enabled = false,
+            visible_color = Color3.new(0, 1, 0), -- green when visible
+            hidden_color = Color3.new(1, 0, 0), -- red when behind wall
+        },
+        whitelist = {
+            enabled = false,
+            players = {}, -- {"PlayerName1", "PlayerName2"}
+        },
+        friends = {
+            enabled = false,
+            friend_color = Color3.new(0, 1, 0), -- green for friends
+            enemy_color = Color3.new(1, 0, 0), -- red for enemies
+            show_tags = false, -- show [F]/[E] tags
+            friends_list = {}, -- {"FriendName1", "FriendName2"}
+        },
     }
     getgenv().esplib = esplib
 end
@@ -56,6 +72,9 @@ esplib.healthbar.low_color = esplib.healthbar.low_color or Color3.new(1,0,0)
 esplib.healthbar.high_color = esplib.healthbar.high_color or Color3.new(0,1,0)
 esplib.name.show_health = esplib.name.show_health == nil and false or esplib.name.show_health
 esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3}
+esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
+esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
+esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
 
 local espinstances = {}
 local espfunctions = {}
@@ -65,6 +84,78 @@ local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
 local user_input_service = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
+
+-- // helper functions
+local function is_whitelisted(instance)
+    if not esplib.whitelist.enabled then return false end
+    
+    local player = players:GetPlayerFromCharacter(instance)
+    if player then
+        for _, name in ipairs(esplib.whitelist.players) do
+            if player.Name == name then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function is_friend(instance)
+    if not esplib.friends.enabled then return false end
+    
+    local player = players:GetPlayerFromCharacter(instance)
+    if player then
+        for _, name in ipairs(esplib.friends.friends_list) do
+            if player.Name == name then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function is_visible(instance)
+    if not esplib.visibility.enabled then return true end
+    
+    local target_part = nil
+    if instance:IsA("Model") then
+        target_part = instance:FindFirstChild("Head") or instance:FindFirstChild("HumanoidRootPart")
+    else
+        target_part = instance
+    end
+    
+    if not target_part then return true end
+    
+    local ray = workspace:Raycast(camera.CFrame.Position, (target_part.Position - camera.CFrame.Position).Unit * 1000)
+    if ray then
+        return ray.Instance:IsDescendantOf(instance)
+    end
+    return true
+end
+
+local function get_esp_color(instance)
+    local base_color = Color3.new(1, 1, 1) -- default white
+    
+    -- Friends/Enemy system
+    if esplib.friends.enabled then
+        if is_friend(instance) then
+            base_color = esplib.friends.friend_color
+        else
+            base_color = esplib.friends.enemy_color
+        end
+    end
+    
+    -- Visibility override
+    if esplib.visibility.enabled then
+        if is_visible(instance) then
+            base_color = esplib.visibility.visible_color
+        else
+            base_color = esplib.visibility.hidden_color
+        end
+    end
+    
+    return base_color
+end
 
 -- // functions
 local function get_bounding_box(instance)
@@ -290,6 +381,35 @@ run_service.RenderStepped:Connect(function()
             continue
         end
         
+        -- Skip whitelisted players
+        if is_whitelisted(instance) then
+            if data.box then
+                data.box.outline.Visible = false
+                data.box.fill.Visible = false
+                for _, line in ipairs(data.box.corner_fill) do
+                    line.Visible = false
+                end
+                for _, line in ipairs(data.box.corner_outline) do
+                    line.Visible = false
+                end
+            end
+            if data.healthbar then
+                data.healthbar.outline.Visible = false
+                data.healthbar.fill.Visible = false
+            end
+            if data.name then
+                data.name.Visible = false
+            end
+            if data.distance then
+                data.distance.Visible = false
+            end
+            if data.tracer then
+                data.tracer.outline.Visible = false
+                data.tracer.fill.Visible = false
+            end
+            continue
+        end
+        
         if instance:IsA("Model") and not instance.PrimaryPart then
             continue
         end
@@ -320,6 +440,8 @@ run_service.RenderStepped:Connect(function()
             transparency = esplib.fade.min_transparency
         end
         
+        local esp_color = get_esp_color(instance)
+        
         if data.box then
             local box = data.box
             if esplib.box.enabled and onscreen then
@@ -345,7 +467,7 @@ run_service.RenderStepped:Connect(function()
                     
                     box.fill.Position = min
                     box.fill.Size = max - min
-                    box.fill.Color = esplib.box.fill
+                    box.fill.Color = esp_color
                     box.fill.Transparency = transparency
                     box.fill.Visible = true
                     
@@ -356,7 +478,7 @@ run_service.RenderStepped:Connect(function()
                     
                     local fill_lines = box.corner_fill
                     local outline_lines = box.corner_outline
-                    local fill_color = esplib.box.fill
+                    local fill_color = esp_color
                     local outline_color = esplib.box.outline
                     
                     local corners = {
@@ -460,6 +582,15 @@ run_service.RenderStepped:Connect(function()
                     local player = players:GetPlayerFromCharacter(instance)
                     if player then
                         name_str = player.Name
+                        
+                        -- Add friend/enemy tags
+                        if esplib.friends.enabled and esplib.friends.show_tags then
+                            if is_friend(instance) then
+                                name_str = "[F] " .. name_str
+                            else
+                                name_str = "[E] " .. name_str
+                            end
+                        end
                     end
                     
                     if esplib.name.show_health and humanoid.MaxHealth > 0 then
@@ -471,7 +602,7 @@ run_service.RenderStepped:Connect(function()
                 
                 text.Text = name_str
                 text.Size = esplib.name.size
-                text.Color = esplib.name.fill
+                text.Color = esp_color
                 text.Transparency = transparency
                 text.Position = Vector2.new(center_x, y)
                 text.Visible = true
@@ -541,7 +672,7 @@ run_service.RenderStepped:Connect(function()
                 
                 fill.From = from_pos
                 fill.To = to_pos
-                fill.Color = esplib.tracer.fill
+                fill.Color = esp_color
                 fill.Transparency = transparency
                 fill.Visible = true
             else
