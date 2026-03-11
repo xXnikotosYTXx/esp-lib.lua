@@ -588,9 +588,7 @@ run_service.RenderStepped:Connect(function()
                 local y = min.Y - 15
                 
                 local name_str = instance.Name
-                local show_tag = false
-                local tag_str = ""
-                local tag_color = Color3.new(1, 1, 1)
+                local full_text = ""
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -598,41 +596,30 @@ run_service.RenderStepped:Connect(function()
                     if player then
                         name_str = player.Name
                         
-                        -- Check for friend/enemy tags
+                        -- Add friend/enemy tags BEFORE name
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                tag_str = "[F] "
-                                tag_color = esplib.friends.friend_color -- green
-                                show_tag = true
+                                full_text = "[F] " .. name_str
                             else
-                                tag_str = "[E] "
-                                tag_color = esplib.friends.enemy_color -- red
-                                show_tag = true
+                                full_text = "[E] " .. name_str
                             end
+                        else
+                            full_text = name_str
                         end
                     end
                     
                     if esplib.name.show_health and humanoid.MaxHealth > 0 then
                         local current_health = math.floor(humanoid.Health)
                         local max_health = math.floor(humanoid.MaxHealth)
-                        name_str = name_str .. " [" .. current_health .. ":" .. max_health .. "]"
+                        full_text = full_text .. " [" .. current_health .. ":" .. max_health .. "]"
                     end
                 end
                 
-                -- Show tag if needed
-                if show_tag then
-                    name_obj.tag.Text = tag_str
-                    name_obj.tag.Size = esplib.name.size
-                    name_obj.tag.Color = tag_color
-                    name_obj.tag.Transparency = transparency
-                    name_obj.tag.Position = Vector2.new(center_x - 20, y) -- offset to left
-                    name_obj.tag.Visible = true
-                else
-                    name_obj.tag.Visible = false
-                end
+                -- Hide tag (not used anymore)
+                name_obj.tag.Visible = false
                 
-                -- Show name (always white)
-                name_obj.text.Text = name_str
+                -- Show full text (white)
+                name_obj.text.Text = full_text
                 name_obj.text.Size = esplib.name.size
                 name_obj.text.Color = esplib.name.fill
                 name_obj.text.Transparency = transparency
