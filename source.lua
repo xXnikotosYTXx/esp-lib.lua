@@ -409,7 +409,7 @@ run_service.RenderStepped:Connect(function()
                     outline.Color = esplib.healthbar.outline
                     outline.Position = Vector2.new(x, y)
                     outline.Size = Vector2.new(1 + 2 * padding, height + 2 * padding)
-                    outline.Transparency = transparency
+                    outline.Transparency = 1
                     outline.Visible = true
                     
                     if esplib.healthbar.gradient then
@@ -518,7 +518,7 @@ run_service.RenderStepped:Connect(function()
                 outline.From = from_pos
                 outline.To = to_pos
                 outline.Color = esplib.tracer.outline
-                outline.Transparency = transparency
+                outline.Transparency = 1
                 outline.Visible = true
                 
                 fill.From = from_pos
