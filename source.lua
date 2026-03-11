@@ -472,18 +472,21 @@ run_service.RenderStepped:Connect(function()
         end
         
         local transparency = 1
-        if esplib.fade.enabled and dist <= esplib.fade.max_distance then
-            local fade_factor = math.clamp(dist / esplib.fade.max_distance, 0, 1)
-            transparency = 1 - (fade_factor * (1 - esplib.fade.min_transparency))
-        elseif esplib.fade.enabled and dist > esplib.fade.max_distance then
-            transparency = esplib.fade.min_transparency
+        if esplib.fade.enabled then
+            if dist > esplib.fade.max_distance then
+                local fade_factor = math.clamp((dist - esplib.fade.max_distance) / esplib.fade.max_distance, 0, 1)
+                transparency = math.max(esplib.fade.min_transparency, 1 - fade_factor)
+            end
         end
         
         local esp_color = get_esp_color(instance)
         
+        -- Optimization: hide boxes at very long distances
+        local show_boxes = dist <= 1000 -- hide boxes beyond 1000 studs
+        
         if data.box then
             local box = data.box
-            if esplib.box.enabled and onscreen then
+            if esplib.box.enabled and onscreen and show_boxes then
                 local x, y = min.X, min.Y
                 local w, h = (max - min).X, (max - min).Y
                 local len = math.min(w, h) * 0.25
@@ -567,7 +570,7 @@ run_service.RenderStepped:Connect(function()
         
         if data.healthbar then
             local outline, fill = data.healthbar.outline, data.healthbar.fill
-            if not esplib.healthbar.enabled or not onscreen then
+            if not esplib.healthbar.enabled or not onscreen or not show_boxes then
                 outline.Visible = false
                 fill.Visible = false
             else
@@ -649,9 +652,8 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- Calculate text width to position tag properly to the left
-                    local name_width = #name_str * 6 -- approximate character width
-                    local tag_start_x = center_x - (name_width / 2) - 30 -- position tag to the left of name
+                    -- Position tag to the left of name with proper spacing
+                    local tag_start_x = center_x - 40 -- fixed distance to the left
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
@@ -726,7 +728,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.tracer then
-            if esplib.tracer.enabled and onscreen then
+            if esplib.tracer.enabled and onscreen and show_boxes then
                 local outline, fill = data.tracer.outline, data.tracer.fill
                 local from_pos = Vector2.new()
                 local to_pos = Vector2.new()
