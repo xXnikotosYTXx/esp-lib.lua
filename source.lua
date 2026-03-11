@@ -46,9 +46,10 @@ if not esplib then
             max_distance = 500,
             min_transparency = 0.3,
             hover_enabled = true, -- hover fade effect
-            hover_radius = 100, -- pixels around cursor
-            hover_transparency = 1.0, -- full visibility on hover
-            animation_speed = 0.1, -- smooth animation
+            hover_radius = 200, -- bigger radius around cursor
+            hover_transparency = 1.0, -- full brightness on hover
+            hover_boost = 2.0, -- extra brightness multiplier (removed, using 1.0 directly)
+            animation_speed = 0.25, -- faster animation
         },
         visibility = {
             enabled = false,
@@ -75,7 +76,7 @@ esplib.healthbar.gradient = esplib.healthbar.gradient == nil and true or esplib.
 esplib.healthbar.low_color = esplib.healthbar.low_color or Color3.new(1,0,0)
 esplib.healthbar.high_color = esplib.healthbar.high_color or Color3.new(0,1,0)
 esplib.name.show_health = esplib.name.show_health == nil and false or esplib.name.show_health
-esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3, hover_enabled = true, hover_radius = 100, hover_transparency = 1.0, animation_speed = 0.1}
+esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3, hover_enabled = true, hover_radius = 200, hover_transparency = 1.0, hover_boost = 2.0, animation_speed = 0.25}
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
@@ -165,7 +166,7 @@ local function calculate_fade_transparency(distance, instance, name_pos)
         end
     end
     
-    -- Hover fade effect
+    -- Hover fade effect - SUPER BRIGHT LIGHT UP
     if esplib.fade.hover_enabled and name_pos then
         local mouse_pos = user_input_service:GetMouseLocation()
         local distance_to_mouse = (Vector2.new(mouse_pos.X, mouse_pos.Y) - name_pos).Magnitude
@@ -175,17 +176,18 @@ local function calculate_fade_transparency(distance, instance, name_pos)
             if not hover_targets[instance] then
                 hover_targets[instance] = {
                     current_transparency = base_transparency,
-                    target_transparency = esplib.fade.hover_transparency,
+                    target_transparency = 1.0, -- full brightness
                 }
             end
-            hover_targets[instance].target_transparency = esplib.fade.hover_transparency
+            -- MAXIMUM brightness for super bright effect
+            hover_targets[instance].target_transparency = 1.0
         else
             if hover_targets[instance] then
                 hover_targets[instance].target_transparency = base_transparency
             end
         end
         
-        -- Animate transparency
+        -- Animate transparency with faster speed
         if hover_targets[instance] then
             local current = hover_targets[instance].current_transparency
             local target = hover_targets[instance].target_transparency
@@ -522,12 +524,17 @@ run_service.RenderStepped:Connect(function()
         end
         
         local transparency = 1
-        if esplib.fade.enabled then
-            if dist > esplib.fade.max_distance then
-                local fade_factor = math.clamp((dist - esplib.fade.max_distance) / esplib.fade.max_distance, 0, 1)
-                transparency = math.max(esplib.fade.min_transparency, 1 - fade_factor)
-            end
+        local name_pos = nil
+        
+        -- Calculate name position for hover detection
+        if onscreen then
+            local center_x = (min.X + max.X) / 2
+            local y = min.Y - 15
+            name_pos = Vector2.new(center_x, y)
         end
+        
+        -- Use hover fade function for better transparency calculation
+        transparency = calculate_fade_transparency(dist, instance, name_pos)
         
         local esp_color = get_esp_color(instance)
         
