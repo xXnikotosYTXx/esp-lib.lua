@@ -731,6 +731,7 @@ run_service.RenderStepped:Connect(function()
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.MaxHealth > 0 then
+                    -- Используем ИСПРАВЛЕННЫЕ размеры бокса (min/max уже содержат минимальные размеры)
                     local height = max.Y - min.Y
                     local width = max.X - min.X
                     local padding = 1
@@ -740,8 +741,8 @@ run_service.RenderStepped:Connect(function()
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
                     if esplib.healthbar.position == "right" then
-                        -- Right side healthbar
-                        x = max.X + 3 + padding
+                        -- Right side healthbar - привязан к исправленному боксу
+                        x = max.X + 2 + padding -- ближе к боксу
                         y = min.Y - padding
                         bar_width = 1 + 2 * padding
                         bar_height = height + 2 * padding
@@ -754,9 +755,9 @@ run_service.RenderStepped:Connect(function()
                         fill.Size = Vector2.new(fillwidth, fillheight)
                         
                     elseif esplib.healthbar.position == "bottom" then
-                        -- Bottom healthbar
+                        -- Bottom healthbar - привязан к исправленному боксу
                         x = min.X - padding
-                        y = max.Y + 3 + padding
+                        y = max.Y + 2 + padding -- ближе к боксу
                         bar_width = width + 2 * padding
                         bar_height = 1 + 2 * padding
                         fillwidth = math.max(width * health, 1)
@@ -768,8 +769,8 @@ run_service.RenderStepped:Connect(function()
                         fill.Size = Vector2.new(fillwidth, fillheight)
                         
                     else
-                        -- Left side healthbar (default)
-                        x = min.X - 3 - 1 - padding
+                        -- Left side healthbar - привязан к исправленному боксу
+                        x = min.X - 2 - 1 - padding -- ближе к боксу
                         y = min.Y - padding
                         bar_width = 1 + 2 * padding
                         bar_height = height + 2 * padding
