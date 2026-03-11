@@ -703,8 +703,10 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- FIXED position - always same distance to the left, regardless of name length
-                    local tag_x = center_x - 50 -- FIXED distance from center
+                    -- Calculate where the name STARTS (left edge of name)
+                    local name_width = #name_str * 6 -- approximate character width
+                    local name_start_x = center_x - (name_width / 2) -- left edge of name
+                    local tag_x = name_start_x - 30 -- position tag BEFORE name start with gap
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
