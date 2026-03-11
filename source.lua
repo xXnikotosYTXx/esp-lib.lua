@@ -72,13 +72,18 @@ if not esplib then
             enabled = false, -- glow effect
             intensity = 0.3, -- glow intensity (0-1)
             size = 2, -- glow size in pixels
-            color = Color3.new(0, 0.5, 1), -- cyan glow color (контрастный с белым)
+            color = Color3.new(0, 0.7, 1), -- cyan glow color
+            max_distance = 100, -- glow only up to 100 studs
         },
         animations = {
             enabled = true, -- smooth animations
-            speed = 0.15, -- animation speed
+            speed = 0.2, -- animation speed
             health_smooth = true, -- smooth health bar changes
             fade_in = true, -- fade in when ESP appears
+            rainbow = false, -- rainbow color animation
+            rainbow_speed = 0.05, -- rainbow animation speed
+            pulse = false, -- pulsing transparency effect
+            pulse_speed = 0.1, -- pulse speed
         },
     }
     getgenv().esplib = esplib
@@ -94,14 +99,16 @@ esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transpare
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
-esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2, color = Color3.new(0, 0.5, 1)}
-esplib.animations = esplib.animations or {enabled = true, speed = 0.15, health_smooth = true, fade_in = true}
+esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2, color = Color3.new(0, 0.7, 1), max_distance = 100}
+esplib.animations = esplib.animations or {enabled = true, speed = 0.2, health_smooth = true, fade_in = true, rainbow = false, rainbow_speed = 0.05, pulse = false, pulse_speed = 0.1}
 
 local espinstances = {}
 local espfunctions = {}
 local hover_targets = {} -- store hover animation data
 local animation_data = {} -- store animation states
 local health_animations = {} -- store health animation data
+local rainbow_time = 0 -- for rainbow animation
+local pulse_time = 0 -- for pulse animation
 
 -- Cleanup function to reset ESP when leaving game
 local function cleanup_esp()
@@ -578,7 +585,31 @@ local function update_animations(instance, base_transparency)
         end
     end
     
-    return base_transparency * anim.alpha
+    local final_transparency = base_transparency * anim.alpha
+    
+    -- Pulse effect
+    if esplib.animations.pulse then
+        pulse_time = pulse_time + esplib.animations.pulse_speed
+        local pulse_factor = (math.sin(pulse_time) + 1) / 2 -- 0 to 1
+        final_transparency = final_transparency * (0.5 + pulse_factor * 0.5) -- pulse between 50% and 100%
+    end
+    
+    return final_transparency
+end
+
+-- Rainbow color animation
+local function get_rainbow_color()
+    if not esplib.animations.rainbow then
+        return nil
+    end
+    
+    rainbow_time = rainbow_time + esplib.animations.rainbow_speed
+    
+    local r = (math.sin(rainbow_time) + 1) / 2
+    local g = (math.sin(rainbow_time + 2.094) + 1) / 2 -- 120 degrees offset
+    local b = (math.sin(rainbow_time + 4.188) + 1) / 2 -- 240 degrees offset
+    
+    return Color3.new(r, g, b)
 end
 
 -- Health animation helper
@@ -763,8 +794,8 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                     
-                    -- Show glow effect first (behind main box)
-                    if esplib.glow.enabled and box.glow_outline then
+                    -- Show glow effect first (behind main box) - ONLY on close distance
+                    if esplib.glow.enabled and box.glow_outline and dist <= esplib.glow.max_distance then
                         box.glow_outline.Position = Vector2.new(min.X - esplib.glow.size, min.Y - esplib.glow.size)
                         box.glow_outline.Size = Vector2.new((max.X - min.X) + esplib.glow.size * 2, (max.Y - min.Y) + esplib.glow.size * 2)
                         box.glow_outline.Color = esplib.glow.color
@@ -776,6 +807,9 @@ run_service.RenderStepped:Connect(function()
                         end
                     end
                     
+                    -- Get animated color for box
+                    local box_color = get_rainbow_color() or esp_color
+                    
                     -- Show normal box
                     box.outline.Position = min
                     box.outline.Size = max - min
@@ -785,7 +819,7 @@ run_service.RenderStepped:Connect(function()
                     
                     box.fill.Position = min
                     box.fill.Size = max - min
-                    box.fill.Color = esp_color
+                    box.fill.Color = box_color -- используем анимированный цвет
                     box.fill.Transparency = transparency
                     box.fill.Visible = true
                     
