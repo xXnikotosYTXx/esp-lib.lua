@@ -72,6 +72,7 @@ if not esplib then
             enabled = false, -- glow effect
             intensity = 0.3, -- glow intensity (0-1)
             size = 2, -- glow size in pixels
+            color = Color3.new(0, 0.5, 1), -- cyan glow color (контрастный с белым)
         },
         animations = {
             enabled = true, -- smooth animations
@@ -93,7 +94,7 @@ esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transpare
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
-esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2}
+esplib.glow = esplib.glow or {enabled = false, intensity = 0.3, size = 2, color = Color3.new(0, 0.5, 1)}
 esplib.animations = esplib.animations or {enabled = true, speed = 0.15, health_smooth = true, fade_in = true}
 
 local espinstances = {}
@@ -734,6 +735,9 @@ run_service.RenderStepped:Connect(function()
         -- Use hover fade function for better transparency calculation
         transparency = calculate_fade_transparency(dist, instance, name_pos)
         
+        -- Apply smooth animations
+        transparency = update_animations(instance, transparency)
+        
         local esp_color = get_esp_color(instance)
         
         -- Optimization: hide boxes/healthbars/tracers beyond 1000 studs, keep names/tags/distance visible
@@ -754,6 +758,22 @@ run_service.RenderStepped:Connect(function()
                     end
                     for _, line in ipairs(box.corner_outline) do
                         line.Visible = false
+                    end
+                    for _, line in ipairs(box.corner_glow or {}) do
+                        line.Visible = false
+                    end
+                    
+                    -- Show glow effect first (behind main box)
+                    if esplib.glow.enabled and box.glow_outline then
+                        box.glow_outline.Position = Vector2.new(min.X - esplib.glow.size, min.Y - esplib.glow.size)
+                        box.glow_outline.Size = Vector2.new((max.X - min.X) + esplib.glow.size * 2, (max.Y - min.Y) + esplib.glow.size * 2)
+                        box.glow_outline.Color = esplib.glow.color
+                        box.glow_outline.Transparency = transparency * esplib.glow.intensity
+                        box.glow_outline.Visible = true
+                    else
+                        if box.glow_outline then
+                            box.glow_outline.Visible = false
+                        end
                     end
                     
                     -- Show normal box
@@ -837,7 +857,7 @@ run_service.RenderStepped:Connect(function()
                     local width = max.X - min.X
                     local padding = 1
                     local current_health = math.max(humanoid.Health, 0) -- защита от отрицательных значений
-                    local health = math.clamp(current_health / humanoid.MaxHealth, 0, 1)
+                    local health = update_health_animation(instance, current_health, humanoid.MaxHealth) -- плавная анимация
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
