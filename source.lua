@@ -710,11 +710,16 @@ run_service.RenderStepped:Connect(function()
                 fill.Visible = false
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
+                if humanoid and humanoid.MaxHealth > 0 then
                     local height = max.Y - min.Y
                     local width = max.X - min.X
                     local padding = 1
-                    local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                    local current_health = math.max(humanoid.Health, 0) -- не меньше 0
+                    local max_health = humanoid.MaxHealth
+                    local health = math.clamp(current_health / max_health, 0, 1)
+                    
+                    -- Debug: print health values
+                    -- print("Health:", current_health, "/", max_health, "=", health)
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
@@ -722,10 +727,10 @@ run_service.RenderStepped:Connect(function()
                         -- Right side healthbar
                         x = max.X + 3 + padding
                         y = min.Y - padding
-                        bar_width = 1 + 2 * padding
+                        bar_width = 3 + 2 * padding -- немного шире
                         bar_height = height + 2 * padding
                         fillheight = math.max(height * health, 1)
-                        fillwidth = 1
+                        fillwidth = 3 -- шире заливка
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
@@ -737,9 +742,9 @@ run_service.RenderStepped:Connect(function()
                         x = min.X - padding
                         y = max.Y + 3 + padding
                         bar_width = width + 2 * padding
-                        bar_height = 1 + 2 * padding
+                        bar_height = 3 + 2 * padding -- немного выше
                         fillwidth = math.max(width * health, 1)
-                        fillheight = 1
+                        fillheight = 3 -- выше заливка
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
@@ -748,12 +753,12 @@ run_service.RenderStepped:Connect(function()
                         
                     else
                         -- Left side healthbar (default)
-                        x = min.X - 3 - 1 - padding
+                        x = min.X - 3 - 3 - padding -- дальше от бокса
                         y = min.Y - padding
-                        bar_width = 1 + 2 * padding
+                        bar_width = 3 + 2 * padding -- шире
                         bar_height = height + 2 * padding
                         fillheight = math.max(height * health, 1)
-                        fillwidth = 1
+                        fillwidth = 3 -- шире заливка
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
@@ -762,10 +767,10 @@ run_service.RenderStepped:Connect(function()
                     end
                     
                     outline.Color = esplib.healthbar.outline
-                    outline.Transparency = 1
+                    outline.Transparency = math.max(transparency, 0.1) -- минимальная видимость
                     outline.Visible = true
                     
-                    if esplib.healthbar.gradient and health > 0 then
+                    if esplib.healthbar.gradient and health >= 0 then -- убрал проверку > 0
                         local low = esplib.healthbar.low_color
                         local high = esplib.healthbar.high_color
                         fill.Color = Color3.new(
@@ -777,7 +782,7 @@ run_service.RenderStepped:Connect(function()
                         fill.Color = esplib.healthbar.fill
                     end
                     
-                    fill.Transparency = transparency
+                    fill.Transparency = math.max(transparency, 0.1) -- минимальная видимость
                     fill.Visible = true
                 else
                     outline.Visible = false
