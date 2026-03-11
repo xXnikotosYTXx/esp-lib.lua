@@ -455,6 +455,26 @@ run_service.RenderStepped:Connect(function()
         
         local min, max, onscreen = get_bounding_box(instance)
         
+        -- For very distant objects, use simpler onscreen check
+        if not onscreen and dist > 1000 then
+            local center_part = nil
+            if instance:IsA("Model") then
+                center_part = instance:FindFirstChild("HumanoidRootPart") or instance:FindFirstChild("Head")
+            else
+                center_part = instance
+            end
+            
+            if center_part then
+                local pos, visible = camera:WorldToViewportPoint(center_part.Position)
+                if visible and pos.Z > 0 then
+                    onscreen = true
+                    -- Create fake bounding box for distant objects
+                    min = Vector2.new(pos.X - 10, pos.Y - 10)
+                    max = Vector2.new(pos.X + 10, pos.Y + 10)
+                end
+            end
+        end
+        
         local dist
         if instance:IsA("Model") then
             if instance.PrimaryPart then
@@ -481,8 +501,9 @@ run_service.RenderStepped:Connect(function()
         
         local esp_color = get_esp_color(instance)
         
-        -- Optimization: hide boxes at very long distances
-        local show_boxes = dist <= 1000 -- hide boxes beyond 1000 studs
+        -- Optimization: hide boxes at long distances, but keep names visible at very long distances
+        local show_boxes = dist <= 800 -- boxes only up to 800 studs
+        local show_names = true -- names always visible regardless of distance
         
         if data.box then
             local box = data.box
@@ -613,7 +634,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.name then
-            if esplib.name.enabled and onscreen then
+            if esplib.name.enabled and onscreen and show_names then
                 local name_obj = data.name
                 local center_x = (min.X + max.X) / 2
                 local y = min.Y - 15
@@ -710,7 +731,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.distance then
-            if esplib.distance.enabled and onscreen then
+            if esplib.distance.enabled and onscreen and show_names then
                 local text = data.distance
                 local center_x = (min.X + max.X) / 2
                 local y = max.Y + 5
