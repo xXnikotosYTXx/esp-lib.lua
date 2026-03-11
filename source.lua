@@ -649,7 +649,9 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    local tag_start_x = center_x - 35 -- start position for tag
+                    -- Calculate text width to position tag properly to the left
+                    local name_width = #name_str * 6 -- approximate character width
+                    local tag_start_x = center_x - (name_width / 2) - 30 -- position tag to the left of name
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
@@ -675,8 +677,8 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
                     name_obj.tag_bracket_right.Visible = true
                     
-                    -- Position name after tag
-                    name_obj.text.Position = Vector2.new(center_x - 5, y)
+                    -- Keep name centered
+                    name_obj.text.Position = Vector2.new(center_x, y)
                 else
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
