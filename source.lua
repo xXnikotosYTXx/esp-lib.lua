@@ -45,6 +45,10 @@ if not esplib then
             enabled = false,
             max_distance = 500,
             min_transparency = 0.3,
+            hover_enabled = true, -- hover fade effect
+            hover_radius = 100, -- pixels around cursor
+            hover_transparency = 1.0, -- full visibility on hover
+            animation_speed = 0.1, -- smooth animation
         },
         visibility = {
             enabled = false,
@@ -71,19 +75,21 @@ esplib.healthbar.gradient = esplib.healthbar.gradient == nil and true or esplib.
 esplib.healthbar.low_color = esplib.healthbar.low_color or Color3.new(1,0,0)
 esplib.healthbar.high_color = esplib.healthbar.high_color or Color3.new(0,1,0)
 esplib.name.show_health = esplib.name.show_health == nil and false or esplib.name.show_health
-esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3}
+esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3, hover_enabled = true, hover_radius = 100, hover_transparency = 1.0, animation_speed = 0.1}
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
 esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
 
 local espinstances = {}
 local espfunctions = {}
+local hover_targets = {} -- store hover animation data
 
 -- // services
 local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
 local user_input_service = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
+local tween_service = game:GetService("TweenService")
 
 -- // helper functions
 local function is_whitelisted(instance)
@@ -146,6 +152,50 @@ local function get_esp_color(instance)
     end
     
     return base_color
+end
+
+local function calculate_fade_transparency(distance, instance, name_pos)
+    local base_transparency = 1
+    
+    -- Distance fade
+    if esplib.fade.enabled then
+        if distance > esplib.fade.max_distance then
+            local fade_factor = math.clamp((distance - esplib.fade.max_distance) / esplib.fade.max_distance, 0, 1)
+            base_transparency = math.max(esplib.fade.min_transparency, 1 - fade_factor)
+        end
+    end
+    
+    -- Hover fade effect
+    if esplib.fade.hover_enabled and name_pos then
+        local mouse_pos = user_input_service:GetMouseLocation()
+        local distance_to_mouse = (Vector2.new(mouse_pos.X, mouse_pos.Y) - name_pos).Magnitude
+        
+        if distance_to_mouse <= esplib.fade.hover_radius then
+            -- Initialize hover data if not exists
+            if not hover_targets[instance] then
+                hover_targets[instance] = {
+                    current_transparency = base_transparency,
+                    target_transparency = esplib.fade.hover_transparency,
+                }
+            end
+            hover_targets[instance].target_transparency = esplib.fade.hover_transparency
+        else
+            if hover_targets[instance] then
+                hover_targets[instance].target_transparency = base_transparency
+            end
+        end
+        
+        -- Animate transparency
+        if hover_targets[instance] then
+            local current = hover_targets[instance].current_transparency
+            local target = hover_targets[instance].target_transparency
+            local new_transparency = current + (target - current) * esplib.fade.animation_speed
+            hover_targets[instance].current_transparency = new_transparency
+            return new_transparency
+        end
+    end
+    
+    return base_transparency
 end
 
 -- // functions
@@ -481,12 +531,13 @@ run_service.RenderStepped:Connect(function()
         
         local esp_color = get_esp_color(instance)
         
-        -- Optimization: hide boxes at very long distances
-        local show_boxes = dist <= 1000 -- hide boxes beyond 1000 studs
+        -- Always show ESP regardless of distance (removed show_boxes limitation)
+        local show_boxes = true -- always show
+        local show_distant_elements = dist <= 2000 -- show all elements up to 2000 studs
         
         if data.box then
             local box = data.box
-            if esplib.box.enabled and onscreen and show_boxes then
+            if esplib.box.enabled and onscreen and show_distant_elements then
                 local x, y = min.X, min.Y
                 local w, h = (max - min).X, (max - min).Y
                 local len = math.min(w, h) * 0.25
@@ -570,7 +621,7 @@ run_service.RenderStepped:Connect(function()
         
         if data.healthbar then
             local outline, fill = data.healthbar.outline, data.healthbar.fill
-            if not esplib.healthbar.enabled or not onscreen or not show_boxes then
+            if not esplib.healthbar.enabled or not onscreen or not show_distant_elements then
                 outline.Visible = false
                 fill.Visible = false
             else
@@ -652,9 +703,8 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- Calculate name width to position tag relative to name
-                    local name_width = #name_str * 7 -- approximate character width
-                    local tag_x = center_x - (name_width / 2) - 35 -- position tag to the left of name start
+                    -- FIXED position - always same distance to the left, regardless of name length
+                    local tag_x = center_x - 50 -- FIXED distance from center
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
@@ -728,7 +778,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.tracer then
-            if esplib.tracer.enabled and onscreen and show_boxes then
+            if esplib.tracer.enabled and onscreen and show_distant_elements then
                 local outline, fill = data.tracer.outline, data.tracer.fill
                 local from_pos = Vector2.new()
                 local to_pos = Vector2.new()
