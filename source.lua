@@ -107,6 +107,7 @@ local espfunctions = {}
 local hover_targets = {} -- store hover animation data
 local animation_data = {} -- store animation states
 local health_animations = {} -- store health animation data
+local glow_animations = {} -- store glow fade animation data
 local rainbow_time = 0 -- for rainbow animation
 local pulse_time = 0 -- for pulse animation
 
@@ -145,6 +146,9 @@ local function cleanup_esp()
     -- Clear all tables
     espinstances = {}
     hover_targets = {}
+    animation_data = {}
+    health_animations = {}
+    glow_animations = {}
 end
 
 -- Connect cleanup to game leaving
@@ -625,7 +629,49 @@ local function get_rainbow_color()
     return Color3.new(r, g, b)
 end
 
--- Health animation helper
+-- Glow fade animation helper
+local function update_glow_fade(instance, distance)
+    if not esplib.glow.enabled then
+        return 0 -- no glow
+    end
+    
+    if not glow_animations[instance] then
+        glow_animations[instance] = {
+            current_alpha = 0,
+            target_alpha = 0,
+        }
+    end
+    
+    local glow_anim = glow_animations[instance]
+    
+    -- Calculate target alpha based on distance
+    if distance <= esplib.glow.max_distance then
+        -- Fade in zone: 0.8 * max_distance to max_distance
+        local fade_start = esplib.glow.max_distance * 0.8
+        if distance <= fade_start then
+            glow_anim.target_alpha = 1.0 -- full glow
+        else
+            -- Smooth fade from full to zero
+            local fade_factor = (distance - fade_start) / (esplib.glow.max_distance - fade_start)
+            glow_anim.target_alpha = 1.0 - fade_factor
+        end
+    else
+        glow_anim.target_alpha = 0 -- no glow
+    end
+    
+    -- Smooth animation to target
+    if glow_anim.current_alpha ~= glow_anim.target_alpha then
+        local diff = glow_anim.target_alpha - glow_anim.current_alpha
+        glow_anim.current_alpha = glow_anim.current_alpha + (diff * esplib.animations.speed * 1.5) -- slightly faster for glow
+        
+        -- Snap if close
+        if math.abs(diff) < 0.01 then
+            glow_anim.current_alpha = glow_anim.target_alpha
+        end
+    end
+    
+    return math.max(glow_anim.current_alpha, 0)
+end
 local function update_health_animation(instance, current_health, max_health)
     if not esplib.animations.health_smooth then
         return current_health / max_health
@@ -807,16 +853,17 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                     
-                    -- Real glow effect with multiple layers - ONLY on close distance
-                    if esplib.glow.enabled and box.glow_layers and dist <= esplib.glow.max_distance then
+                    -- Real glow effect with smooth fade
+                    local glow_alpha = update_glow_fade(instance, dist)
+                    if glow_alpha > 0 and box.glow_layers then
                         for i, glow in ipairs(box.glow_layers) do
                             local layer_size = i * esplib.glow.size
-                            local layer_transparency = transparency * esplib.glow.intensity * (1 - (i - 1) * 0.2) -- decreasing intensity
+                            local layer_transparency = transparency * esplib.glow.intensity * glow_alpha * (1 - (i - 1) * 0.2) -- decreasing intensity
                             
                             glow.Position = Vector2.new(min.X - layer_size, min.Y - layer_size)
                             glow.Size = Vector2.new((max.X - min.X) + layer_size * 2, (max.Y - min.Y) + layer_size * 2)
                             glow.Color = esplib.glow.color
-                            glow.Transparency = math.max(layer_transparency, 0.1)
+                            glow.Transparency = math.max(layer_transparency, 0.05)
                             glow.Visible = true
                         end
                     else
@@ -876,14 +923,15 @@ run_service.RenderStepped:Connect(function()
                         local oFrom = from - dir
                         local oTo = to + dir
                         
-                        -- Corner glow effect
-                        if esplib.glow.enabled and glow_lines[i] and dist <= esplib.glow.max_distance then
+                        -- Corner glow effect with smooth fade
+                        local glow_alpha = update_glow_fade(instance, dist)
+                        if glow_alpha > 0 and glow_lines[i] then
                             for j, glow in ipairs(glow_lines[i]) do
-                                local glow_transparency = transparency * esplib.glow.intensity * (1 - (j - 1) * 0.3)
+                                local glow_transparency = transparency * esplib.glow.intensity * glow_alpha * (1 - (j - 1) * 0.3)
                                 glow.From = from - dir * j
                                 glow.To = to + dir * j
                                 glow.Color = esplib.glow.color
-                                glow.Transparency = math.max(glow_transparency, 0.1)
+                                glow.Transparency = math.max(glow_transparency, 0.05)
                                 glow.Visible = true
                             end
                         else
