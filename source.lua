@@ -67,7 +67,6 @@ if not esplib then
             enemy_color = Color3.new(1, 0, 0), -- red for enemies
             show_tags = false, -- show [F]/[E] tags
             friends_list = {}, -- {"FriendName1", "FriendName2"}
-            tag_color_enabled = true, -- color the tag letters
         },
     }
     getgenv().esplib = esplib
@@ -82,7 +81,7 @@ esplib.name.show_health = esplib.name.show_health == nil and false or esplib.nam
 esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3, hover_enabled = true, hover_radius = 200, hover_transparency = 1.0, hover_boost = 2.0, animation_speed = 0.25}
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
-esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}, tag_color_enabled = true}
+esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
 
 local espinstances = {}
 local espfunctions = {}
@@ -616,13 +615,13 @@ run_service.RenderStepped:Connect(function()
         
         local esp_color = get_esp_color(instance)
         
-        -- Always show ESP regardless of distance (removed show_boxes limitation)
-        local show_boxes = true -- always show
-        local show_distant_elements = dist <= 2000 -- show all elements up to 2000 studs
+        -- Always show ESP regardless of distance
+        local show_boxes = true -- always show boxes and healthbars
+        local show_distant_elements = dist <= 2000 -- only tracers are limited by distance
         
         if data.box then
             local box = data.box
-            if esplib.box.enabled and onscreen and show_distant_elements then
+            if esplib.box.enabled and onscreen and show_boxes then
                 local x, y = min.X, min.Y
                 local w, h = (max - min).X, (max - min).Y
                 local len = math.min(w, h) * 0.25
@@ -706,7 +705,7 @@ run_service.RenderStepped:Connect(function()
         
         if data.healthbar then
             local outline, fill = data.healthbar.outline, data.healthbar.fill
-            if not esplib.healthbar.enabled or not onscreen or not show_distant_elements then
+            if not esplib.healthbar.enabled or not onscreen or not show_boxes then
                 outline.Visible = false
                 fill.Visible = false
             else
@@ -796,9 +795,6 @@ run_service.RenderStepped:Connect(function()
                 local name_str = instance.Name
                 local tag_str = ""
                 local health_str = ""
-                local show_colored_tag = false
-                local tag_letter = ""
-                local tag_color = Color3.new(1, 1, 1)
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -809,19 +805,9 @@ run_service.RenderStepped:Connect(function()
                         -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                tag_str = " [F]" -- white brackets with F
-                                if esplib.friends.tag_color_enabled then
-                                    show_colored_tag = true
-                                    tag_letter = "F"
-                                    tag_color = esplib.friends.friend_color -- green F
-                                end
+                                tag_str = " [F]" -- friend tag
                             else
-                                tag_str = " [E]" -- white brackets with E
-                                if esplib.friends.tag_color_enabled then
-                                    show_colored_tag = true
-                                    tag_letter = "E"
-                                    tag_color = esplib.friends.enemy_color -- red E
-                                end
+                                tag_str = " [E]" -- enemy tag
                             end
                         end
                     end
@@ -836,32 +822,17 @@ run_service.RenderStepped:Connect(function()
                 -- Combine: "PlayerName [100:100] [E]" - тег ПОСЛЕ хила
                 local full_text = name_str .. health_str .. tag_str
                 
-                -- Hide old separate tag objects
+                -- Hide all separate tag objects
                 name_obj.tag_bracket_left.Visible = false
+                name_obj.tag_letter.Visible = false
                 name_obj.tag_bracket_right.Visible = false
                 
-                -- Show main text (all white)
+                -- Show combined text (all white)
                 name_obj.text.Text = full_text
                 name_obj.text.Size = esplib.name.size
                 name_obj.text.Color = esplib.name.fill
                 name_obj.text.Transparency = transparency
                 name_obj.text.Visible = true
-                
-                -- Show colored tag letter on top if enabled
-                if show_colored_tag and tag_str ~= "" then
-                    -- Calculate position of the tag letter in the text
-                    local base_text = name_str .. health_str .. " ["
-                    local tag_letter_x_offset = #base_text * 4 -- approximate character width
-                    
-                    name_obj.tag_letter.Text = tag_letter
-                    name_obj.tag_letter.Size = esplib.name.size
-                    name_obj.tag_letter.Color = tag_color
-                    name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(center_x - (#full_text * 3.5) + tag_letter_x_offset, y)
-                    name_obj.tag_letter.Visible = true
-                else
-                    name_obj.tag_letter.Visible = false
-                end
                 
                 -- Name stays centered
                 name_obj.text.Position = Vector2.new(center_x, y)
