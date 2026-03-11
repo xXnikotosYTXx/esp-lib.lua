@@ -166,7 +166,7 @@ local function calculate_fade_transparency(distance, instance, name_pos)
         end
     end
     
-    -- Hover fade effect - SUPER BRIGHT LIGHT UP
+    -- Hover fade effect - SUPER DRAMATIC LIGHT UP
     if esplib.fade.hover_enabled and name_pos then
         local mouse_pos = user_input_service:GetMouseLocation()
         local distance_to_mouse = (Vector2.new(mouse_pos.X, mouse_pos.Y) - name_pos).Magnitude
@@ -179,7 +179,7 @@ local function calculate_fade_transparency(distance, instance, name_pos)
                     target_transparency = 1.0, -- full brightness
                 }
             end
-            -- MAXIMUM brightness for super bright effect
+            -- MAXIMUM brightness for super bright effect - OVERRIDE base transparency
             hover_targets[instance].target_transparency = 1.0
         else
             if hover_targets[instance] then
@@ -193,7 +193,13 @@ local function calculate_fade_transparency(distance, instance, name_pos)
             local target = hover_targets[instance].target_transparency
             local new_transparency = current + (target - current) * esplib.fade.animation_speed
             hover_targets[instance].current_transparency = new_transparency
-            return new_transparency
+            
+            -- FORCE full brightness when hovering - no matter what base transparency is
+            if distance_to_mouse <= esplib.fade.hover_radius then
+                return 1.0 -- ALWAYS full brightness when hovering
+            else
+                return new_transparency
+            end
         end
     end
     
