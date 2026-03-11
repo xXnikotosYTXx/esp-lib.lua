@@ -117,10 +117,6 @@ end
 local function is_visible(instance)
     if not esplib.visibility.enabled then return true end
     
-    -- Skip expensive raycast for distant objects
-    local dist = get_distance_fast(instance)
-    if dist > 500 then return true end
-    
     local target_part = nil
     if instance:IsA("Model") then
         target_part = instance:FindFirstChild("Head") or instance:FindFirstChild("HumanoidRootPart")
@@ -135,18 +131,6 @@ local function is_visible(instance)
         return ray.Instance:IsDescendantOf(instance)
     end
     return true
-end
-
-local function get_distance_fast(instance)
-    if instance:IsA("Model") then
-        local part = instance.PrimaryPart or instance:FindFirstChild("HumanoidRootPart")
-        if part then
-            return (camera.CFrame.Position - part.Position).Magnitude
-        end
-    else
-        return (camera.CFrame.Position - instance.Position).Magnitude
-    end
-    return 999
 end
 
 local function get_esp_color(instance)
@@ -471,48 +455,21 @@ run_service.RenderStepped:Connect(function()
         
         local min, max, onscreen = get_bounding_box(instance)
         
-        -- Skip expensive calculations for very distant objects
-        if dist > 2000 then
-            -- Hide everything for very distant objects
-            if data.box then
-                data.box.outline.Visible = false
-                data.box.fill.Visible = false
-                for _, line in ipairs(data.box.corner_fill) do
-                    line.Visible = false
-                end
-                for _, line in ipairs(data.box.corner_outline) do
-                    line.Visible = false
-                end
-            end
-            if data.healthbar then
-                data.healthbar.outline.Visible = false
-                data.healthbar.fill.Visible = false
-            end
-            if data.tracer then
-                data.tracer.outline.Visible = false
-                data.tracer.fill.Visible = false
-            end
-            if data.name then
-                if data.name.text then
-                    data.name.text.Visible = false
-                end
-                if data.name.tag_bracket_left then
-                    data.name.tag_bracket_left.Visible = false
-                end
-                if data.name.tag_letter then
-                    data.name.tag_letter.Visible = false
-                end
-                if data.name.tag_bracket_right then
-                    data.name.tag_bracket_right.Visible = false
+        local dist
+        if instance:IsA("Model") then
+            if instance.PrimaryPart then
+                dist = (camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
+            else
+                local part = instance:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    dist = (camera.CFrame.Position - part.Position).Magnitude
+                else
+                    dist = 999
                 end
             end
-            if data.distance then
-                data.distance.Visible = false
-            end
-            continue
+        else
+            dist = (camera.CFrame.Position - instance.Position).Magnitude
         end
-        
-        local dist = get_distance_fast(instance)
         
         local transparency = 1
         if esplib.fade.enabled then
@@ -524,9 +481,8 @@ run_service.RenderStepped:Connect(function()
         
         local esp_color = get_esp_color(instance)
         
-        -- Optimization: hide boxes at long distances, but keep names visible at very long distances
-        local show_boxes = dist <= 800 -- boxes only up to 800 studs
-        local show_names = true -- names always visible regardless of distance
+        -- Optimization: hide boxes at very long distances
+        local show_boxes = dist <= 1000 -- hide boxes beyond 1000 studs
         
         if data.box then
             local box = data.box
@@ -657,7 +613,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.name then
-            if esplib.name.enabled and onscreen and show_names then
+            if esplib.name.enabled and onscreen then
                 local name_obj = data.name
                 local center_x = (min.X + max.X) / 2
                 local y = min.Y - 15
@@ -696,15 +652,15 @@ run_service.RenderStepped:Connect(function()
                 
                 -- Show tag parts if needed
                 if show_tag then
-                    -- Position tag INDEPENDENTLY to the left, regardless of name length
-                    local tag_x = min.X - 50 -- fixed position to the left of the box
+                    -- Position tag to the left of name with proper spacing
+                    local tag_start_x = center_x - 40 -- fixed distance to the left
                     
                     -- White left bracket [
                     name_obj.tag_bracket_left.Text = "["
                     name_obj.tag_bracket_left.Size = esplib.name.size
                     name_obj.tag_bracket_left.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_left.Transparency = transparency
-                    name_obj.tag_bracket_left.Position = Vector2.new(tag_x, y)
+                    name_obj.tag_bracket_left.Position = Vector2.new(tag_start_x, y)
                     name_obj.tag_bracket_left.Visible = true
                     
                     -- Colored letter E/F
@@ -712,7 +668,7 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_letter.Size = esplib.name.size
                     name_obj.tag_letter.Color = tag_color -- red E or green F
                     name_obj.tag_letter.Transparency = transparency
-                    name_obj.tag_letter.Position = Vector2.new(tag_x + 8, y)
+                    name_obj.tag_letter.Position = Vector2.new(tag_start_x + 8, y)
                     name_obj.tag_letter.Visible = true
                     
                     -- White right bracket ]
@@ -720,16 +676,17 @@ run_service.RenderStepped:Connect(function()
                     name_obj.tag_bracket_right.Size = esplib.name.size
                     name_obj.tag_bracket_right.Color = Color3.new(1, 1, 1) -- white
                     name_obj.tag_bracket_right.Transparency = transparency
-                    name_obj.tag_bracket_right.Position = Vector2.new(tag_x + 16, y)
+                    name_obj.tag_bracket_right.Position = Vector2.new(tag_start_x + 16, y)
                     name_obj.tag_bracket_right.Visible = true
+                    
+                    -- Keep name centered
+                    name_obj.text.Position = Vector2.new(center_x, y)
                 else
                     name_obj.tag_bracket_left.Visible = false
                     name_obj.tag_letter.Visible = false
                     name_obj.tag_bracket_right.Visible = false
+                    name_obj.text.Position = Vector2.new(center_x, y)
                 end
-                
-                -- Name stays centered regardless of tag
-                name_obj.text.Position = Vector2.new(center_x, y)
                 
                 -- Show name (always white)
                 name_obj.text.Text = name_str
@@ -754,7 +711,7 @@ run_service.RenderStepped:Connect(function()
         end
         
         if data.distance then
-            if esplib.distance.enabled and onscreen and show_names then
+            if esplib.distance.enabled and onscreen then
                 local text = data.distance
                 local center_x = (min.X + max.X) / 2
                 local y = max.Y + 5
