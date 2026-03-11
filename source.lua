@@ -305,17 +305,33 @@ function espfunctions.add_name(instance)
     text.Font = 1
     text.Transparency = 1
     
-    local tag = Drawing.new("Text")
-    tag.Center = false
-    tag.Outline = true
-    tag.Font = 1
-    tag.Transparency = 1
-    tag.Visible = false
+    local tag_bracket_left = Drawing.new("Text")
+    tag_bracket_left.Center = false
+    tag_bracket_left.Outline = true
+    tag_bracket_left.Font = 1
+    tag_bracket_left.Transparency = 1
+    tag_bracket_left.Visible = false
+    
+    local tag_letter = Drawing.new("Text")
+    tag_letter.Center = false
+    tag_letter.Outline = true
+    tag_letter.Font = 1
+    tag_letter.Transparency = 1
+    tag_letter.Visible = false
+    
+    local tag_bracket_right = Drawing.new("Text")
+    tag_bracket_right.Center = false
+    tag_bracket_right.Outline = true
+    tag_bracket_right.Font = 1
+    tag_bracket_right.Transparency = 1
+    tag_bracket_right.Visible = false
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].name = {
         text = text,
-        tag = tag,
+        tag_bracket_left = tag_bracket_left,
+        tag_letter = tag_letter,
+        tag_bracket_right = tag_bracket_right,
     }
 end
 
@@ -588,7 +604,9 @@ run_service.RenderStepped:Connect(function()
                 local y = min.Y - 15
                 
                 local name_str = instance.Name
-                local full_text = ""
+                local show_tag = false
+                local tag_color = Color3.new(1, 1, 1)
+                local is_friend_tag = false
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -596,34 +614,52 @@ run_service.RenderStepped:Connect(function()
                     if player then
                         name_str = player.Name
                         
-                        -- Add friend/enemy tags BEFORE name
+                        -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                full_text = "[F] " .. name_str
+                                show_tag = true
+                                is_friend_tag = true
+                                tag_color = esplib.friends.friend_color -- green F
                             else
-                                full_text = "[E] " .. name_str
+                                show_tag = true
+                                is_friend_tag = false
+                                tag_color = esplib.friends.enemy_color -- red E
                             end
-                        else
-                            full_text = name_str
                         end
                     end
                     
                     if esplib.name.show_health and humanoid.MaxHealth > 0 then
                         local current_health = math.floor(humanoid.Health)
                         local max_health = math.floor(humanoid.MaxHealth)
-                        full_text = full_text .. " [" .. current_health .. ":" .. max_health .. "]"
+                        name_str = name_str .. " [" .. current_health .. ":" .. max_health .. "]"
                     end
                 end
                 
-                -- Hide tag (not used anymore)
-                name_obj.tag.Visible = false
+                -- Show colored tag if needed
+                if show_tag then
+                    name_obj.tag.Text = is_friend_tag and "[F]" or "[E]"
+                    name_obj.tag.Size = esplib.name.size
+                    name_obj.tag.Color = tag_color
+                    name_obj.tag.Transparency = transparency
+                    
+                    -- Calculate tag width for positioning
+                    local tag_width = 25 -- approximate width of [E] or [F]
+                    name_obj.tag.Position = Vector2.new(center_x - tag_width, y)
+                    name_obj.tag.Visible = true
+                    
+                    -- Position name after tag
+                    name_obj.text.Text = " " .. name_str -- space before name
+                    name_obj.text.Position = Vector2.new(center_x - 5, y)
+                else
+                    name_obj.tag.Visible = false
+                    name_obj.text.Text = name_str
+                    name_obj.text.Position = Vector2.new(center_x, y)
+                end
                 
-                -- Show full text (white)
-                name_obj.text.Text = full_text
+                -- Show name (always white)
                 name_obj.text.Size = esplib.name.size
                 name_obj.text.Color = esplib.name.fill
                 name_obj.text.Transparency = transparency
-                name_obj.text.Position = Vector2.new(center_x, y)
                 name_obj.text.Visible = true
             else
                 if data.name.text then
