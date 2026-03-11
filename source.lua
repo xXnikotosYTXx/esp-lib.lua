@@ -23,6 +23,7 @@ if not esplib then
             gradient = true,
             low_color = Color3.new(1,0,0),
             high_color = Color3.new(0,1,0),
+            position = "left", -- left, right, bottom
         },
         name = {
             enabled = true,
@@ -66,6 +67,7 @@ if not esplib then
             enemy_color = Color3.new(1, 0, 0), -- red for enemies
             show_tags = false, -- show [F]/[E] tags
             friends_list = {}, -- {"FriendName1", "FriendName2"}
+            tag_color_enabled = true, -- color the tag letters
         },
     }
     getgenv().esplib = esplib
@@ -75,11 +77,12 @@ end
 esplib.healthbar.gradient = esplib.healthbar.gradient == nil and true or esplib.healthbar.gradient
 esplib.healthbar.low_color = esplib.healthbar.low_color or Color3.new(1,0,0)
 esplib.healthbar.high_color = esplib.healthbar.high_color or Color3.new(0,1,0)
+esplib.healthbar.position = esplib.healthbar.position or "left"
 esplib.name.show_health = esplib.name.show_health == nil and false or esplib.name.show_health
 esplib.fade = esplib.fade or {enabled = false, max_distance = 500, min_transparency = 0.3, hover_enabled = true, hover_radius = 200, hover_transparency = 1.0, hover_boost = 2.0, animation_speed = 0.25}
 esplib.visibility = esplib.visibility or {enabled = false, visible_color = Color3.new(0, 1, 0), hidden_color = Color3.new(1, 0, 0)}
 esplib.whitelist = esplib.whitelist or {enabled = false, players = {}}
-esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}}
+esplib.friends = esplib.friends or {enabled = false, friend_color = Color3.new(0, 1, 0), enemy_color = Color3.new(1, 0, 0), show_tags = false, friends_list = {}, tag_color_enabled = true}
 
 local espinstances = {}
 local espfunctions = {}
@@ -710,15 +713,56 @@ run_service.RenderStepped:Connect(function()
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 and humanoid.MaxHealth > 0 then
                     local height = max.Y - min.Y
+                    local width = max.X - min.X
                     local padding = 1
-                    local x = min.X - 3 - 1 - padding
-                    local y = min.Y - padding
                     local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                    local fillheight = math.max(height * health, 1) -- minimum 1 pixel height
+                    
+                    local x, y, bar_width, bar_height, fillheight, fillwidth
+                    
+                    if esplib.healthbar.position == "right" then
+                        -- Right side healthbar
+                        x = max.X + 3 + padding
+                        y = min.Y - padding
+                        bar_width = 1 + 2 * padding
+                        bar_height = height + 2 * padding
+                        fillheight = math.max(height * health, 1)
+                        fillwidth = 1
+                        
+                        outline.Position = Vector2.new(x, y)
+                        outline.Size = Vector2.new(bar_width, bar_height)
+                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Size = Vector2.new(fillwidth, fillheight)
+                        
+                    elseif esplib.healthbar.position == "bottom" then
+                        -- Bottom healthbar
+                        x = min.X - padding
+                        y = max.Y + 3 + padding
+                        bar_width = width + 2 * padding
+                        bar_height = 1 + 2 * padding
+                        fillwidth = math.max(width * health, 1)
+                        fillheight = 1
+                        
+                        outline.Position = Vector2.new(x, y)
+                        outline.Size = Vector2.new(bar_width, bar_height)
+                        fill.Position = Vector2.new(x + padding, y + padding)
+                        fill.Size = Vector2.new(fillwidth, fillheight)
+                        
+                    else
+                        -- Left side healthbar (default)
+                        x = min.X - 3 - 1 - padding
+                        y = min.Y - padding
+                        bar_width = 1 + 2 * padding
+                        bar_height = height + 2 * padding
+                        fillheight = math.max(height * health, 1)
+                        fillwidth = 1
+                        
+                        outline.Position = Vector2.new(x, y)
+                        outline.Size = Vector2.new(bar_width, bar_height)
+                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Size = Vector2.new(fillwidth, fillheight)
+                    end
                     
                     outline.Color = esplib.healthbar.outline
-                    outline.Position = Vector2.new(x, y)
-                    outline.Size = Vector2.new(1 + 2 * padding, height + 2 * padding)
                     outline.Transparency = 1
                     outline.Visible = true
                     
@@ -734,8 +778,6 @@ run_service.RenderStepped:Connect(function()
                         fill.Color = esplib.healthbar.fill
                     end
                     
-                    fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
-                    fill.Size = Vector2.new(1, fillheight)
                     fill.Transparency = transparency
                     fill.Visible = true
                 else
@@ -754,6 +796,9 @@ run_service.RenderStepped:Connect(function()
                 local name_str = instance.Name
                 local tag_str = ""
                 local health_str = ""
+                local show_colored_tag = false
+                local tag_letter = ""
+                local tag_color = Color3.new(1, 1, 1)
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
@@ -764,9 +809,19 @@ run_service.RenderStepped:Connect(function()
                         -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
                             if is_friend(instance) then
-                                tag_str = " [F]" -- green F
+                                tag_str = " [F]" -- white brackets with F
+                                if esplib.friends.tag_color_enabled then
+                                    show_colored_tag = true
+                                    tag_letter = "F"
+                                    tag_color = esplib.friends.friend_color -- green F
+                                end
                             else
-                                tag_str = " [E]" -- red E
+                                tag_str = " [E]" -- white brackets with E
+                                if esplib.friends.tag_color_enabled then
+                                    show_colored_tag = true
+                                    tag_letter = "E"
+                                    tag_color = esplib.friends.enemy_color -- red E
+                                end
                             end
                         end
                     end
@@ -781,14 +836,32 @@ run_service.RenderStepped:Connect(function()
                 -- Combine: "PlayerName [100:100] [E]" - тег ПОСЛЕ хила
                 local full_text = name_str .. health_str .. tag_str
                 
-                -- Hide all separate tag objects
+                -- Hide old separate tag objects
                 name_obj.tag_bracket_left.Visible = false
-                name_obj.tag_letter.Visible = false
                 name_obj.tag_bracket_right.Visible = false
                 
-                -- Show combined text (all white for now)
+                -- Show main text (all white)
                 name_obj.text.Text = full_text
                 name_obj.text.Size = esplib.name.size
+                name_obj.text.Color = esplib.name.fill
+                name_obj.text.Transparency = transparency
+                name_obj.text.Visible = true
+                
+                -- Show colored tag letter on top if enabled
+                if show_colored_tag and tag_str ~= "" then
+                    -- Calculate position of the tag letter in the text
+                    local base_text = name_str .. health_str .. " ["
+                    local tag_letter_x_offset = #base_text * 4 -- approximate character width
+                    
+                    name_obj.tag_letter.Text = tag_letter
+                    name_obj.tag_letter.Size = esplib.name.size
+                    name_obj.tag_letter.Color = tag_color
+                    name_obj.tag_letter.Transparency = transparency
+                    name_obj.tag_letter.Position = Vector2.new(center_x - (#full_text * 3.5) + tag_letter_x_offset, y)
+                    name_obj.tag_letter.Visible = true
+                else
+                    name_obj.tag_letter.Visible = false
+                end
                 
                 -- Name stays centered
                 name_obj.text.Position = Vector2.new(center_x, y)
