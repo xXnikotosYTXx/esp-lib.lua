@@ -117,6 +117,10 @@ end
 local function is_visible(instance)
     if not esplib.visibility.enabled then return true end
     
+    -- Skip expensive raycast for distant objects
+    local dist = get_distance_fast(instance)
+    if dist > 500 then return true end
+    
     local target_part = nil
     if instance:IsA("Model") then
         target_part = instance:FindFirstChild("Head") or instance:FindFirstChild("HumanoidRootPart")
@@ -131,6 +135,18 @@ local function is_visible(instance)
         return ray.Instance:IsDescendantOf(instance)
     end
     return true
+end
+
+local function get_distance_fast(instance)
+    if instance:IsA("Model") then
+        local part = instance.PrimaryPart or instance:FindFirstChild("HumanoidRootPart")
+        if part then
+            return (camera.CFrame.Position - part.Position).Magnitude
+        end
+    else
+        return (camera.CFrame.Position - instance.Position).Magnitude
+    end
+    return 999
 end
 
 local function get_esp_color(instance)
@@ -455,41 +471,48 @@ run_service.RenderStepped:Connect(function()
         
         local min, max, onscreen = get_bounding_box(instance)
         
-        -- For very distant objects, use simpler onscreen check
-        if not onscreen and dist > 1000 then
-            local center_part = nil
-            if instance:IsA("Model") then
-                center_part = instance:FindFirstChild("HumanoidRootPart") or instance:FindFirstChild("Head")
-            else
-                center_part = instance
-            end
-            
-            if center_part then
-                local pos, visible = camera:WorldToViewportPoint(center_part.Position)
-                if visible and pos.Z > 0 then
-                    onscreen = true
-                    -- Create fake bounding box for distant objects
-                    min = Vector2.new(pos.X - 10, pos.Y - 10)
-                    max = Vector2.new(pos.X + 10, pos.Y + 10)
+        -- Skip expensive calculations for very distant objects
+        if dist > 2000 then
+            -- Hide everything for very distant objects
+            if data.box then
+                data.box.outline.Visible = false
+                data.box.fill.Visible = false
+                for _, line in ipairs(data.box.corner_fill) do
+                    line.Visible = false
+                end
+                for _, line in ipairs(data.box.corner_outline) do
+                    line.Visible = false
                 end
             end
+            if data.healthbar then
+                data.healthbar.outline.Visible = false
+                data.healthbar.fill.Visible = false
+            end
+            if data.tracer then
+                data.tracer.outline.Visible = false
+                data.tracer.fill.Visible = false
+            end
+            if data.name then
+                if data.name.text then
+                    data.name.text.Visible = false
+                end
+                if data.name.tag_bracket_left then
+                    data.name.tag_bracket_left.Visible = false
+                end
+                if data.name.tag_letter then
+                    data.name.tag_letter.Visible = false
+                end
+                if data.name.tag_bracket_right then
+                    data.name.tag_bracket_right.Visible = false
+                end
+            end
+            if data.distance then
+                data.distance.Visible = false
+            end
+            continue
         end
         
-        local dist
-        if instance:IsA("Model") then
-            if instance.PrimaryPart then
-                dist = (camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
-            else
-                local part = instance:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    dist = (camera.CFrame.Position - part.Position).Magnitude
-                else
-                    dist = 999
-                end
-            end
-        else
-            dist = (camera.CFrame.Position - instance.Position).Magnitude
-        end
+        local dist = get_distance_fast(instance)
         
         local transparency = 1
         if esplib.fade.enabled then
