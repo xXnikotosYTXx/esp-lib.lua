@@ -182,6 +182,48 @@ local user_input_service = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
 local tween_service = game:GetService("TweenService")
 
+-- ✅ ПАТЧ 1: Авто ESP — новые игроки и respawn
+local function setup_character(character)
+    if not character then return end
+    health_animations[character] = nil
+    animation_data[character] = nil
+    hover_targets[character] = nil
+    glow_animations[character] = nil
+    task.wait(0.5)
+    if not character.Parent then return end
+    espfunctions.add_box(character)
+    espfunctions.add_healthbar(character)
+    espfunctions.add_name(character)
+    espfunctions.add_distance(character)
+    espfunctions.add_tracer(character)
+end
+
+local function setup_player(player)
+    if player == players.LocalPlayer then return end
+    player.CharacterAdded:Connect(function(character)
+        espinstances[character] = nil
+        health_animations[character] = nil
+        glow_animations[character] = nil
+        setup_character(character)
+    end)
+    player.CharacterRemoving:Connect(function(character)
+        espinstances[character] = nil
+        health_animations[character] = nil
+        glow_animations[character] = nil
+    end)
+    if player.Character then setup_character(player.Character) end
+end
+
+for _, p in ipairs(players:GetPlayers()) do setup_player(p) end
+players.PlayerAdded:Connect(function(p) setup_player(p) end)
+players.PlayerRemoving:Connect(function(p)
+    if p.Character then
+        espinstances[p.Character] = nil
+        health_animations[p.Character] = nil
+        glow_animations[p.Character] = nil
+    end
+end)
+
 -- // helper functions
 local function is_whitelisted(instance)
     if not esplib.whitelist.enabled then return false end
@@ -502,6 +544,8 @@ function espfunctions.add_healthbar(instance)
         outline = outline,
         fill = fill,
     }
+    -- ✅ ПАТЧ 2: сброс при respawn чтобы healthbar не был тёмным
+    health_animations[instance] = nil
 end
 
 function espfunctions.add_name(instance)
@@ -743,6 +787,7 @@ local function update_glow_fade(instance, distance)
     
     return math.max(glow_anim.current_alpha, 0)
 end
+
 local function update_health_animation(instance, current_health, max_health)
     if not esplib.animations.health_smooth then
         return current_health / max_health
@@ -766,6 +811,13 @@ local function update_health_animation(instance, current_health, max_health)
     
     health_anim.target_health = current_health
     
+    -- ✅ ПАТЧ 3: snap если HP резко вырос (respawn с 0 до maxHP)
+    if current_health > health_anim.displayed_health + max_health * 0.3 then
+        health_anim.displayed_health = current_health
+        health_anim.target_health = current_health
+        return math.clamp(current_health / max_health, 0, 1)
+    end
+    
     -- Smooth health changes
     if health_anim.displayed_health ~= health_anim.target_health then
         local diff = health_anim.target_health - health_anim.displayed_health
@@ -779,7 +831,6 @@ local function update_health_animation(instance, current_health, max_health)
     
     return math.clamp(health_anim.displayed_health / max_health, 0, 1)
 end
-
 -- // main thread
 run_service.RenderStepped:Connect(function()
     -- Safety check - if we're not in a valid game state, cleanup and return
@@ -825,8 +876,18 @@ run_service.RenderStepped:Connect(function()
                 data.tracer.outline:Remove()
                 data.tracer.fill:Remove()
             end
+            if glow_animations[instance] then glow_animations[instance] = nil end
+            if hover_targets[instance] then hover_targets[instance] = nil end
+            if animation_data[instance] then animation_data[instance] = nil end
+            if health_animations[instance] then health_animations[instance] = nil end
             espinstances[instance] = nil
             continue
+        end
+        
+        -- скрываем glow если humanoid умер
+        local _hum_dead = instance:IsA("Model") and instance:FindFirstChildOfClass("Humanoid")
+        if _hum_dead and _hum_dead.Health <= 0 and glow_animations[instance] then
+            glow_animations[instance].target_alpha = 0
         end
         
         -- Skip whitelisted players
@@ -1287,6 +1348,92 @@ run_service.RenderStepped:Connect(function()
             end
         end
     end
+end)
+
+-- // proximity arrows
+esplib.arrows = esplib.arrows or {
+    enabled = false,
+    color = Color3.new(1, 1, 1),
+    edge_distance = 80,
+    size = 16,
+}
+
+local arrow_drawings = {}
+
+local function update_proximity_arrows()
+    if not esplib.arrows.enabled then
+        for _, a in pairs(arrow_drawings) do
+            a.line1.Visible = false
+            a.line2.Visible = false
+            a.line3.Visible = false
+        end
+        return
+    end
+    local vp = camera.ViewportSize
+    local cx, cy = vp.X / 2, vp.Y / 2
+    local edge = esplib.arrows.edge_distance
+    local size = esplib.arrows.size
+    local used = {}
+    for instance, data in pairs(espinstances) do
+        if not instance or not instance.Parent then continue end
+        local part = (instance:IsA("Model") and (instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart"))) or instance
+        if not part then continue end
+        local hum = instance:IsA("Model") and instance:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health <= 0 then continue end
+        local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+        if onScreen then
+            if arrow_drawings[instance] then
+                arrow_drawings[instance].line1.Visible = false
+                arrow_drawings[instance].line2.Visible = false
+                arrow_drawings[instance].line3.Visible = false
+            end
+            continue
+        end
+        local dir2d = Vector2.new(screenPos.X - cx, screenPos.Y - cy)
+        if dir2d.Magnitude == 0 then continue end
+        local angle = math.atan2(dir2d.Y, dir2d.X)
+        local px = math.clamp(cx + math.cos(angle) * (cx - edge), edge, vp.X - edge)
+        local py = math.clamp(cy + math.sin(angle) * (cy - edge), edge, vp.Y - edge)
+        if not arrow_drawings[instance] then
+            local function nl()
+                local l = Drawing.new("Line")
+                l.Thickness = 2
+                l.Transparency = 1
+                l.Visible = false
+                return l
+            end
+            arrow_drawings[instance] = { line1 = nl(), line2 = nl(), line3 = nl() }
+        end
+        local a = arrow_drawings[instance]
+        local bx = px - math.cos(angle) * size
+        local by = py - math.sin(angle) * size
+        a.line1.From = Vector2.new(bx, by)
+        a.line1.To = Vector2.new(px, py)
+        a.line1.Color = esplib.arrows.color
+        a.line1.Visible = true
+        local la = angle + math.rad(140)
+        a.line2.From = Vector2.new(px, py)
+        a.line2.To = Vector2.new(px + math.cos(la) * size * 0.5, py + math.sin(la) * size * 0.5)
+        a.line2.Color = esplib.arrows.color
+        a.line2.Visible = true
+        local ra = angle - math.rad(140)
+        a.line3.From = Vector2.new(px, py)
+        a.line3.To = Vector2.new(px + math.cos(ra) * size * 0.5, py + math.sin(ra) * size * 0.5)
+        a.line3.Color = esplib.arrows.color
+        a.line3.Visible = true
+        used[instance] = true
+    end
+    for instance, a in pairs(arrow_drawings) do
+        if not used[instance] then
+            a.line1.Visible = false
+            a.line2.Visible = false
+            a.line3.Visible = false
+        end
+    end
+end
+
+run_service.RenderStepped:Connect(function()
+    pcall(update_proximity_arrows)
 end)
 
 -- // return
