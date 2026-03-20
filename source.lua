@@ -231,7 +231,7 @@ local function is_visible(instance)
 end
 
 local function get_esp_color(instance)
-    local base_color = esplib.box.fill -- default user configured!
+    local base_color = Color3.new(1, 1, 1) -- default white
     
     -- Only visibility check changes ESP color
     if esplib.visibility.enabled then
@@ -403,13 +403,11 @@ function espfunctions.add_box(instance)
     
     local outline = Drawing.new("Square")
     outline.Filled = false
-    outline.Thickness = 3 -- ИСПРАВЛЕНИЕ Z-FIGHTING (устраняет баг с черными игроками)
     outline.Transparency = 1
     outline.Visible = false
     
     local fill = Drawing.new("Square")
     fill.Filled = false
-    fill.Thickness = 1 -- ИСПРАВЛЕНИЕ Z-FIGHTING (заливка будет поверх, но не будет перекрываться)
     fill.Transparency = 1
     fill.Visible = false
     
@@ -827,13 +825,7 @@ run_service.RenderStepped:Connect(function()
                 data.tracer.outline:Remove()
                 data.tracer.fill:Remove()
             end
-            
-            -- ИСПРАВЛЕНИЕ УТЕЧКИ ПАМЯТИ: Полная очистка инстанса из всех таблиц
             espinstances[instance] = nil
-            health_animations[instance] = nil
-            animation_data[instance] = nil
-            hover_targets[instance] = nil
-            glow_animations[instance] = nil
             continue
         end
         
@@ -1077,19 +1069,12 @@ run_service.RenderStepped:Connect(function()
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.MaxHealth > 0 then
-                    -- ИСПРАВЛЕНИЕ: NaN фикс для багующихся healthbars (+ предотвращение краша)
-                    local raw_health = humanoid.Health
-                    if raw_health ~= raw_health then raw_health = 0 end -- Защита от NaN
-                    local raw_maxhealth = humanoid.MaxHealth
-                    if raw_maxhealth ~= raw_maxhealth then raw_maxhealth = 100 end -- Защита от NaN MaxHealth
-                    
-                    local current_health = math.max(raw_health, 0)
-                    local health = update_health_animation(instance, current_health, raw_maxhealth) -- плавная анимация
-                    
                     -- Используем ИСПРАВЛЕННЫЕ размеры бокса (min/max уже содержат минимальные размеры)
                     local height = max.Y - min.Y
                     local width = max.X - min.X
                     local padding = 1
+                    local current_health = math.max(humanoid.Health, 0) -- защита от отрицательных значений
+                    local health = update_health_animation(instance, current_health, humanoid.MaxHealth) -- плавная анимация
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
