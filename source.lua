@@ -373,7 +373,7 @@ local function get_bounding_box(instance)
         end
     end
     
-    -- ИСПРАВЛЕНИЕ: Минимальный размер бокса и правильные пропорции
+    -- ИСПРАВЛЕНИЕ: Минимальный размер бокса и правильные пропорции + math.floor для фикса дрожания
     if onscreen then
         local width = max.X - min.X
         local height = max.Y - min.Y
@@ -388,9 +388,9 @@ local function get_bounding_box(instance)
         width = math.max(width, min_width)
         height = math.max(height, min_height)
         
-        -- Пересчитываем min/max с новыми размерами и центрированием
-        min = Vector2.new(center_x - width/2, center_y - height/2)
-        max = Vector2.new(center_x + width/2, center_y + height/2)
+        -- Пересчитываем min/max с новыми размерами и центрированием + math.floor
+        min = Vector2.new(math.floor(center_x - width/2), math.floor(center_y - height/2))
+        max = Vector2.new(math.floor(center_x + width/2), math.floor(center_y + height/2))
     end
     
     return min, max, onscreen
@@ -405,11 +405,15 @@ function espfunctions.add_box(instance)
     outline.Filled = false
     outline.Transparency = 1
     outline.Visible = false
+    outline.Thickness = 3
+    pcall(function() outline.ZIndex = 1 end) -- Фикс Z-Fighting
     
     local fill = Drawing.new("Square")
     fill.Filled = false
     fill.Transparency = 1
     fill.Visible = false
+    fill.Thickness = 1
+    pcall(function() fill.ZIndex = 2 end)
     
     -- Multiple glow layers for REAL glow effect - IMPROVED
     local glow_layers = {}
@@ -419,6 +423,7 @@ function espfunctions.add_box(instance)
         glow.Transparency = 1
         glow.Visible = false
         glow.Thickness = math.ceil(i * 1.5) -- более плавное увеличение толщины
+        pcall(function() glow.ZIndex = 0 end)
         table.insert(glow_layers, glow)
     end
     
@@ -431,14 +436,16 @@ function espfunctions.add_box(instance)
     
     for i = 1, 8 do
         local outline = Drawing.new("Line")
-        outline.Thickness = 2
+        outline.Thickness = 3
         outline.Transparency = 1
         outline.Visible = false
+        pcall(function() outline.ZIndex = 1 end)
         
         local fill = Drawing.new("Line")
         fill.Thickness = 1
         fill.Transparency = 1
         fill.Visible = false
+        pcall(function() fill.ZIndex = 2 end)
         
         -- Corner glow layers - IMPROVED
         local corner_glow_layers = {}
@@ -447,6 +454,7 @@ function espfunctions.add_box(instance)
             glow.Thickness = math.ceil(j * 2.5) -- более плавное увеличение толщины
             glow.Transparency = 1
             glow.Visible = false
+            pcall(function() glow.ZIndex = 0 end)
             table.insert(corner_glow_layers, glow)
         end
         
@@ -492,10 +500,12 @@ function espfunctions.add_healthbar(instance)
     outline.Thickness = 1
     outline.Filled = true
     outline.Transparency = 1
+    pcall(function() outline.ZIndex = 1 end)
     
     local fill = Drawing.new("Square")
     fill.Filled = true
     fill.Transparency = 1
+    pcall(function() fill.ZIndex = 2 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].healthbar = {
@@ -512,6 +522,7 @@ function espfunctions.add_name(instance)
     text.Outline = true
     text.Font = 1
     text.Transparency = 1
+    pcall(function() text.ZIndex = 3 end)
     
     local tag_bracket_left = Drawing.new("Text")
     tag_bracket_left.Center = false
@@ -519,6 +530,7 @@ function espfunctions.add_name(instance)
     tag_bracket_left.Font = 1
     tag_bracket_left.Transparency = 1
     tag_bracket_left.Visible = false
+    pcall(function() tag_bracket_left.ZIndex = 3 end)
     
     local tag_letter = Drawing.new("Text")
     tag_letter.Center = false
@@ -526,6 +538,7 @@ function espfunctions.add_name(instance)
     tag_letter.Font = 1
     tag_letter.Transparency = 1
     tag_letter.Visible = false
+    pcall(function() tag_letter.ZIndex = 3 end)
     
     local tag_bracket_right = Drawing.new("Text")
     tag_bracket_right.Center = false
@@ -533,6 +546,7 @@ function espfunctions.add_name(instance)
     tag_bracket_right.Font = 1
     tag_bracket_right.Transparency = 1
     tag_bracket_right.Visible = false
+    pcall(function() tag_bracket_right.ZIndex = 3 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].name = {
@@ -551,6 +565,7 @@ function espfunctions.add_distance(instance)
     text.Outline = true
     text.Font = 1
     text.Transparency = 1
+    pcall(function() text.ZIndex = 3 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].distance = text
@@ -633,10 +648,12 @@ function espfunctions.add_tracer(instance)
     local outline = Drawing.new("Line")
     outline.Thickness = 2
     outline.Transparency = 1
+    pcall(function() outline.ZIndex = 1 end)
     
     local fill = Drawing.new("Line")
     fill.Thickness = 1
     fill.Transparency = 1
+    pcall(function() fill.ZIndex = 2 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].tracer = {
@@ -745,7 +762,9 @@ local function update_glow_fade(instance, distance)
 end
 local function update_health_animation(instance, current_health, max_health)
     if not esplib.animations.health_smooth then
-        return current_health / max_health
+        local res = current_health / max_health
+        if res ~= res then return 0 end -- NaN fix
+        return math.clamp(res, 0, 1)
     end
     
     if not health_animations[instance] then
@@ -777,7 +796,9 @@ local function update_health_animation(instance, current_health, max_health)
         end
     end
     
-    return math.clamp(health_anim.displayed_health / max_health, 0, 1)
+    local res = health_anim.displayed_health / max_health
+    if res ~= res then return 0 end -- NaN fix
+    return math.clamp(res, 0, 1)
 end
 
 -- // main thread
@@ -791,39 +812,36 @@ run_service.RenderStepped:Connect(function()
     for instance, data in pairs(espinstances) do
         if not instance or not instance.Parent then
             if data.box then
-                data.box.outline:Remove()
-                data.box.fill:Remove()
+                pcall(function() data.box.outline:Remove() end)
+                pcall(function() data.box.fill:Remove() end)
                 for _, line in ipairs(data.box.corner_fill) do
-                    line:Remove()
+                    pcall(function() line:Remove() end)
                 end
                 for _, line in ipairs(data.box.corner_outline) do
-                    line:Remove()
+                    pcall(function() line:Remove() end)
+                end
+                if data.box.glow_layers then
+                    for _, glow in ipairs(data.box.glow_layers) do
+                        pcall(function() glow:Remove() end)
+                    end
                 end
             end
             if data.healthbar then
-                data.healthbar.outline:Remove()
-                data.healthbar.fill:Remove()
+                pcall(function() data.healthbar.outline:Remove() end)
+                pcall(function() data.healthbar.fill:Remove() end)
             end
             if data.name then
-                if data.name.text then
-                    data.name.text:Remove()
-                end
-                if data.name.tag_bracket_left then
-                    data.name.tag_bracket_left:Remove()
-                end
-                if data.name.tag_letter then
-                    data.name.tag_letter:Remove()
-                end
-                if data.name.tag_bracket_right then
-                    data.name.tag_bracket_right:Remove()
-                end
+                if data.name.text then pcall(function() data.name.text:Remove() end) end
+                if data.name.tag_bracket_left then pcall(function() data.name.tag_bracket_left:Remove() end) end
+                if data.name.tag_letter then pcall(function() data.name.tag_letter:Remove() end) end
+                if data.name.tag_bracket_right then pcall(function() data.name.tag_bracket_right:Remove() end) end
             end
             if data.distance then
-                data.distance:Remove()
+                pcall(function() data.distance:Remove() end)
             end
             if data.tracer then
-                data.tracer.outline:Remove()
-                data.tracer.fill:Remove()
+                pcall(function() data.tracer.outline:Remove() end)
+                pcall(function() data.tracer.fill:Remove() end)
             end
             espinstances[instance] = nil
             continue
@@ -834,34 +852,20 @@ run_service.RenderStepped:Connect(function()
             if data.box then
                 data.box.outline.Visible = false
                 data.box.fill.Visible = false
-                for _, line in ipairs(data.box.corner_fill) do
-                    line.Visible = false
-                end
-                for _, line in ipairs(data.box.corner_outline) do
-                    line.Visible = false
-                end
+                for _, line in ipairs(data.box.corner_fill) do line.Visible = false end
+                for _, line in ipairs(data.box.corner_outline) do line.Visible = false end
             end
             if data.healthbar then
                 data.healthbar.outline.Visible = false
                 data.healthbar.fill.Visible = false
             end
             if data.name then
-                if data.name.text then
-                    data.name.text.Visible = false
-                end
-                if data.name.tag_bracket_left then
-                    data.name.tag_bracket_left.Visible = false
-                end
-                if data.name.tag_letter then
-                    data.name.tag_letter.Visible = false
-                end
-                if data.name.tag_bracket_right then
-                    data.name.tag_bracket_right.Visible = false
-                end
+                if data.name.text then data.name.text.Visible = false end
+                if data.name.tag_bracket_left then data.name.tag_bracket_left.Visible = false end
+                if data.name.tag_letter then data.name.tag_letter.Visible = false end
+                if data.name.tag_bracket_right then data.name.tag_bracket_right.Visible = false end
             end
-            if data.distance then
-                data.distance.Visible = false
-            end
+            if data.distance then data.distance.Visible = false end
             if data.tracer then
                 data.tracer.outline.Visible = false
                 data.tracer.fill.Visible = false
@@ -922,14 +926,10 @@ run_service.RenderStepped:Connect(function()
                 
                 if esplib.box.type == "normal" then
                     -- Hide ALL corner lines first
-                    for _, line in ipairs(box.corner_fill) do
-                        line.Visible = false
-                    end
-                    for _, line in ipairs(box.corner_outline) do
-                        line.Visible = false
-                    end
+                    for _, line in ipairs(box.corner_fill) do line.Visible = false end
+                    for _, line in ipairs(box.corner_outline) do line.Visible = false end
                     for _, line in ipairs(box.corner_glow or {}) do
-                        line.Visible = false
+                        for _, gl in ipairs(line) do gl.Visible = false end
                     end
                     
                     -- Real glow effect with smooth fade - IMPROVED GLOW LAYERS
@@ -940,17 +940,15 @@ run_service.RenderStepped:Connect(function()
                             -- IMPROVED: More realistic glow with exponential falloff
                             local layer_transparency = transparency * esplib.glow.intensity * glow_alpha * math.pow(0.6, i - 1) -- экспоненциальное затухание
                             
-                            glow.Position = Vector2.new(min.X - layer_size, min.Y - layer_size)
-                            glow.Size = Vector2.new((max.X - min.X) + layer_size * 2, (max.Y - min.Y) + layer_size * 2)
+                            glow.Position = Vector2.new(math.floor(min.X - layer_size), math.floor(min.Y - layer_size))
+                            glow.Size = Vector2.new(math.floor((max.X - min.X) + layer_size * 2), math.floor((max.Y - min.Y) + layer_size * 2))
                             glow.Color = esplib.glow.color
                             glow.Transparency = math.max(layer_transparency, 0.02) -- минимальная прозрачность для видимости
                             glow.Visible = true
                         end
                     else
                         if box.glow_layers then
-                            for _, glow in ipairs(box.glow_layers) do
-                                glow.Visible = false
-                            end
+                            for _, glow in ipairs(box.glow_layers) do glow.Visible = false end
                         end
                     end
                     
@@ -975,9 +973,7 @@ run_service.RenderStepped:Connect(function()
                     box.outline.Visible = false
                     box.fill.Visible = false
                     if box.glow_layers then
-                        for _, glow in ipairs(box.glow_layers) do
-                            glow.Visible = false
-                        end
+                        for _, glow in ipairs(box.glow_layers) do glow.Visible = false end
                     end
                     
                     local fill_lines = box.corner_fill
@@ -1017,22 +1013,18 @@ run_service.RenderStepped:Connect(function()
                             end
                         else
                             if glow_lines[i] then
-                                for _, glow in ipairs(glow_lines[i]) do
-                                    glow.Visible = false
-                                end
+                                for _, glow in ipairs(glow_lines[i]) do glow.Visible = false end
                             end
                         end
                         
                         local o = outline_lines[i]
-                        o.From = oFrom
-                        o.To = oTo
+                        o.From = oFrom o.To = oTo
                         o.Color = outline_color
                         o.Transparency = transparency
                         o.Visible = true
                         
                         local f = fill_lines[i]
-                        f.From = from
-                        f.To = to
+                        f.From = from f.To = to
                         f.Color = fill_color
                         f.Transparency = transparency
                         f.Visible = true
@@ -1043,20 +1035,12 @@ run_service.RenderStepped:Connect(function()
                 box.outline.Visible = false
                 box.fill.Visible = false
                 if box.glow_layers then
-                    for _, glow in ipairs(box.glow_layers) do
-                        glow.Visible = false
-                    end
+                    for _, glow in ipairs(box.glow_layers) do glow.Visible = false end
                 end
-                for _, line in ipairs(box.corner_fill) do
-                    line.Visible = false
-                end
-                for _, line in ipairs(box.corner_outline) do
-                    line.Visible = false
-                end
+                for _, line in ipairs(box.corner_fill) do line.Visible = false end
+                for _, line in ipairs(box.corner_outline) do line.Visible = false end
                 for _, corner_glow_layers in ipairs(box.corner_glow) do
-                    for _, glow in ipairs(corner_glow_layers) do
-                        glow.Visible = false
-                    end
+                    for _, glow in ipairs(corner_glow_layers) do glow.Visible = false end
                 end
             end
         end
@@ -1068,37 +1052,41 @@ run_service.RenderStepped:Connect(function()
                 fill.Visible = false
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.MaxHealth > 0 then
+                local h_val = humanoid and humanoid.Health or 0
+                local m_val = humanoid and humanoid.MaxHealth or 100
+                if h_val ~= h_val or h_val < 0 then h_val = 0 end
+                if m_val ~= m_val or m_val <= 0 then m_val = 100 end
+                
+                if humanoid then
                     -- Используем ИСПРАВЛЕННЫЕ размеры бокса (min/max уже содержат минимальные размеры)
                     local height = max.Y - min.Y
                     local width = max.X - min.X
                     local padding = 1
-                    local current_health = math.max(humanoid.Health, 0) -- защита от отрицательных значений
-                    local health = update_health_animation(instance, current_health, humanoid.MaxHealth) -- плавная анимация
+                    local health = update_health_animation(instance, h_val, m_val) -- плавная анимация
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
                     if esplib.healthbar.position == "right" then
                         -- Right side healthbar - привязан к исправленному боксу
-                        x = max.X + 2 + padding -- ближе к боксу
-                        y = min.Y - padding
+                        x = math.floor(max.X + 2 + padding) -- ближе к боксу
+                        y = math.floor(min.Y - padding)
                         bar_width = 1 + 2 * padding
-                        bar_height = height + 2 * padding
-                        fillheight = math.max(height * health, 1)
+                        bar_height = math.floor(height + 2 * padding)
+                        fillheight = math.floor(math.max(height * health, 1))
                         fillwidth = 1
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
-                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Position = Vector2.new(x + padding, math.floor(y + (height + padding) - fillheight))
                         fill.Size = Vector2.new(fillwidth, fillheight)
                         
                     elseif esplib.healthbar.position == "bottom" then
                         -- Bottom healthbar - привязан к исправленному боксу
-                        x = min.X - padding
-                        y = max.Y + 2 + padding -- ближе к боксу
-                        bar_width = width + 2 * padding
+                        x = math.floor(min.X - padding)
+                        y = math.floor(max.Y + 2 + padding) -- ближе к боксу
+                        bar_width = math.floor(width + 2 * padding)
                         bar_height = 1 + 2 * padding
-                        fillwidth = math.max(width * health, 1)
+                        fillwidth = math.floor(math.max(width * health, 1))
                         fillheight = 1
                         
                         outline.Position = Vector2.new(x, y)
@@ -1108,16 +1096,16 @@ run_service.RenderStepped:Connect(function()
                         
                     else
                         -- Left side healthbar - привязан к исправленному боксу
-                        x = min.X - 2 - 1 - padding -- ближе к боксу
-                        y = min.Y - padding
+                        x = math.floor(min.X - 2 - 1 - padding) -- ближе к боксу
+                        y = math.floor(min.Y - padding)
                         bar_width = 1 + 2 * padding
-                        bar_height = height + 2 * padding
-                        fillheight = math.max(height * health, 1)
+                        bar_height = math.floor(height + 2 * padding)
+                        fillheight = math.floor(math.max(height * health, 1))
                         fillwidth = 1
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
-                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Position = Vector2.new(x + padding, math.floor(y + (height + padding) - fillheight))
                         fill.Size = Vector2.new(fillwidth, fillheight)
                     end
                     
@@ -1149,26 +1137,22 @@ run_service.RenderStepped:Connect(function()
         if data.name then
             if esplib.name.enabled and onscreen then
                 local name_obj = data.name
-                local center_x = (min.X + max.X) / 2
-                local y = min.Y - 15
+                local center_x = math.floor((min.X + max.X) / 2)
+                local y = math.floor(min.Y - 15)
                 
                 local name_str = instance.Name
                 local tag_str = ""
                 local health_str = ""
                 
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health > 0 then
+                if humanoid then
                     local player = players:GetPlayerFromCharacter(instance)
                     if player then
                         name_str = player.Name
                         
                         -- Check for friend/enemy tags
                         if esplib.friends.enabled and esplib.friends.show_tags then
-                            if is_friend(instance) then
-                                tag_str = " [F]" -- friend tag
-                            else
-                                tag_str = " [E]" -- enemy tag
-                            end
+                            if is_friend(instance) then tag_str = " [F]" else tag_str = " [E]" end
                         end
                     end
                     
@@ -1202,26 +1186,18 @@ run_service.RenderStepped:Connect(function()
                 name_obj.text.Transparency = transparency
                 name_obj.text.Visible = true
             else
-                if data.name.text then
-                    data.name.text.Visible = false
-                end
-                if data.name.tag_bracket_left then
-                    data.name.tag_bracket_left.Visible = false
-                end
-                if data.name.tag_letter then
-                    data.name.tag_letter.Visible = false
-                end
-                if data.name.tag_bracket_right then
-                    data.name.tag_bracket_right.Visible = false
-                end
+                if data.name.text then data.name.text.Visible = false end
+                if data.name.tag_bracket_left then data.name.tag_bracket_left.Visible = false end
+                if data.name.tag_letter then data.name.tag_letter.Visible = false end
+                if data.name.tag_bracket_right then data.name.tag_bracket_right.Visible = false end
             end
         end
         
         if data.distance then
             if esplib.distance.enabled and onscreen then
                 local text = data.distance
-                local center_x = (min.X + max.X) / 2
-                local y = max.Y + 5
+                local center_x = math.floor((min.X + max.X) / 2)
+                local y = math.floor(max.Y + 5)
                 
                 text.Text = tostring(math.floor(dist)) .. "m"
                 text.Size = esplib.distance.size
@@ -1247,14 +1223,9 @@ run_service.RenderStepped:Connect(function()
                     local head = instance:FindFirstChild("Head")
                     if head then
                         local pos, visible = camera:WorldToViewportPoint(head.Position)
-                        if visible then
-                            from_pos = Vector2.new(pos.X, pos.Y)
-                        else
-                            from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
-                        end
-                    else
-                        from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
-                    end
+                        if visible then from_pos = Vector2.new(pos.X, pos.Y)
+                        else from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y) end
+                    else from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y) end
                 elseif esplib.tracer.from == "bottom" then
                     from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
                 elseif esplib.tracer.from == "center" then
@@ -1267,7 +1238,7 @@ run_service.RenderStepped:Connect(function()
                 
                 -- If box is enabled, attach tracer to bottom center of box
                 if esplib.box.enabled then
-                    to_pos = Vector2.new((min.X + max.X) / 2, max.Y)
+                    to_pos = Vector2.new(math.floor((min.X + max.X) / 2), math.floor(max.Y))
                 end
                 
                 outline.From = from_pos
