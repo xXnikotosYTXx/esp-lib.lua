@@ -388,9 +388,9 @@ local function get_bounding_box(instance)
         width = math.max(width, min_width)
         height = math.max(height, min_height)
         
-        -- Пересчитываем min/max с новыми размерами и центрированием
-        min = Vector2.new(center_x - width/2, center_y - height/2)
-        max = Vector2.new(center_x + width/2, center_y + height/2)
+        -- Пересчитываем min/max с новыми размерами и центрированием (с math.floor для фикса дрожания и отслоений)
+        min = Vector2.new(math.floor(center_x - width/2), math.floor(center_y - height/2))
+        max = Vector2.new(math.floor(center_x + width/2), math.floor(center_y + height/2))
     end
     
     return min, max, onscreen
@@ -403,13 +403,17 @@ function espfunctions.add_box(instance)
     
     local outline = Drawing.new("Square")
     outline.Filled = false
+    outline.Thickness = 3
     outline.Transparency = 1
     outline.Visible = false
+    pcall(function() outline.ZIndex = 1 end) -- Фикс Z-Fighting (черный бокс поверх белого)
     
     local fill = Drawing.new("Square")
     fill.Filled = false
+    fill.Thickness = 1
     fill.Transparency = 1
     fill.Visible = false
+    pcall(function() fill.ZIndex = 2 end)
     
     -- Multiple glow layers for REAL glow effect - IMPROVED
     local glow_layers = {}
@@ -419,6 +423,7 @@ function espfunctions.add_box(instance)
         glow.Transparency = 1
         glow.Visible = false
         glow.Thickness = math.ceil(i * 1.5) -- более плавное увеличение толщины
+        pcall(function() glow.ZIndex = 0 end)
         table.insert(glow_layers, glow)
     end
     
@@ -431,14 +436,16 @@ function espfunctions.add_box(instance)
     
     for i = 1, 8 do
         local outline = Drawing.new("Line")
-        outline.Thickness = 2
+        outline.Thickness = 3 -- ИСПРАВЛЕНИЕ: для корнеров рамка тоже 3
         outline.Transparency = 1
         outline.Visible = false
+        pcall(function() outline.ZIndex = 1 end)
         
         local fill = Drawing.new("Line")
         fill.Thickness = 1
         fill.Transparency = 1
         fill.Visible = false
+        pcall(function() fill.ZIndex = 2 end)
         
         -- Corner glow layers - IMPROVED
         local corner_glow_layers = {}
@@ -447,6 +454,7 @@ function espfunctions.add_box(instance)
             glow.Thickness = math.ceil(j * 2.5) -- более плавное увеличение толщины
             glow.Transparency = 1
             glow.Visible = false
+            pcall(function() glow.ZIndex = 0 end)
             table.insert(corner_glow_layers, glow)
         end
         
@@ -492,10 +500,12 @@ function espfunctions.add_healthbar(instance)
     outline.Thickness = 1
     outline.Filled = true
     outline.Transparency = 1
+    pcall(function() outline.ZIndex = 1 end)
     
     local fill = Drawing.new("Square")
     fill.Filled = true
     fill.Transparency = 1
+    pcall(function() fill.ZIndex = 2 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].healthbar = {
@@ -512,6 +522,7 @@ function espfunctions.add_name(instance)
     text.Outline = true
     text.Font = 1
     text.Transparency = 1
+    pcall(function() text.ZIndex = 4 end)
     
     local tag_bracket_left = Drawing.new("Text")
     tag_bracket_left.Center = false
@@ -551,6 +562,7 @@ function espfunctions.add_distance(instance)
     text.Outline = true
     text.Font = 1
     text.Transparency = 1
+    pcall(function() text.ZIndex = 4 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].distance = text
@@ -633,10 +645,12 @@ function espfunctions.add_tracer(instance)
     local outline = Drawing.new("Line")
     outline.Thickness = 2
     outline.Transparency = 1
+    pcall(function() outline.ZIndex = 1 end)
     
     local fill = Drawing.new("Line")
     fill.Thickness = 1
     fill.Transparency = 1
+    pcall(function() fill.ZIndex = 2 end)
     
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].tracer = {
@@ -917,7 +931,7 @@ run_service.RenderStepped:Connect(function()
             local box = data.box
             if esplib.box.enabled and onscreen and show_boxes then
                 local x, y = min.X, min.Y
-                local w, h = (max - min).X, (max - min).Y
+                local w, h = (max.X - min.X), (max.Y - min.Y)
                 local len = math.min(w, h) * 0.25
                 
                 if esplib.box.type == "normal" then
@@ -1068,37 +1082,45 @@ run_service.RenderStepped:Connect(function()
                 fill.Visible = false
             else
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.MaxHealth > 0 then
+                if humanoid then
+                    local raw_health = humanoid.Health
+                    if type(raw_health) ~= "number" or raw_health ~= raw_health then raw_health = 0 end 
+                    local raw_maxhealth = humanoid.MaxHealth
+                    if type(raw_maxhealth) ~= "number" or raw_maxhealth ~= raw_maxhealth or raw_maxhealth <= 0 then raw_maxhealth = 100 end 
+                    
+                    local current_health = math.clamp(raw_health, 0, raw_maxhealth)
+                    local anim_health = update_health_animation(instance, current_health, raw_maxhealth) 
+                    if type(anim_health) ~= "number" or anim_health ~= anim_health then anim_health = 1 end
+                    local health = math.clamp(anim_health, 0, 1)
+
                     -- Используем ИСПРАВЛЕННЫЕ размеры бокса (min/max уже содержат минимальные размеры)
-                    local height = max.Y - min.Y
-                    local width = max.X - min.X
+                    local height = math.floor(max.Y - min.Y)
+                    local width = math.floor(max.X - min.X)
                     local padding = 1
-                    local current_health = math.max(humanoid.Health, 0) -- защита от отрицательных значений
-                    local health = update_health_animation(instance, current_health, humanoid.MaxHealth) -- плавная анимация
                     
                     local x, y, bar_width, bar_height, fillheight, fillwidth
                     
                     if esplib.healthbar.position == "right" then
                         -- Right side healthbar - привязан к исправленному боксу
-                        x = max.X + 2 + padding -- ближе к боксу
-                        y = min.Y - padding
-                        bar_width = 1 + 2 * padding
+                        bar_width = 3 -- 1 fill + 2 padding
+                        x = math.floor(max.X + padding + 1)
+                        y = math.floor(min.Y - padding)
                         bar_height = height + 2 * padding
-                        fillheight = math.max(height * health, 1)
+                        fillheight = math.max(math.floor(height * health), 1)
                         fillwidth = 1
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
-                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Position = Vector2.new(x + padding, y + padding + (height - fillheight))
                         fill.Size = Vector2.new(fillwidth, fillheight)
                         
                     elseif esplib.healthbar.position == "bottom" then
                         -- Bottom healthbar - привязан к исправленному боксу
-                        x = min.X - padding
-                        y = max.Y + 2 + padding -- ближе к боксу
+                        x = math.floor(min.X - padding)
+                        y = math.floor(max.Y + padding + 1)
                         bar_width = width + 2 * padding
-                        bar_height = 1 + 2 * padding
-                        fillwidth = math.max(width * health, 1)
+                        bar_height = 3
+                        fillwidth = math.max(math.floor(width * health), 1)
                         fillheight = 1
                         
                         outline.Position = Vector2.new(x, y)
@@ -1108,16 +1130,16 @@ run_service.RenderStepped:Connect(function()
                         
                     else
                         -- Left side healthbar - привязан к исправленному боксу
-                        x = min.X - 2 - 1 - padding -- ближе к боксу
-                        y = min.Y - padding
-                        bar_width = 1 + 2 * padding
+                        bar_width = 3
+                        x = math.floor(min.X - bar_width - padding) -- ближе к боксу
+                        y = math.floor(min.Y - padding)
                         bar_height = height + 2 * padding
-                        fillheight = math.max(height * health, 1)
+                        fillheight = math.max(math.floor(height * health), 1)
                         fillwidth = 1
                         
                         outline.Position = Vector2.new(x, y)
                         outline.Size = Vector2.new(bar_width, bar_height)
-                        fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                        fill.Position = Vector2.new(x + padding, y + padding + (height - fillheight))
                         fill.Size = Vector2.new(fillwidth, fillheight)
                     end
                     
@@ -1129,7 +1151,7 @@ run_service.RenderStepped:Connect(function()
                         local low = esplib.healthbar.low_color
                         local high = esplib.healthbar.high_color
                         fill.Color = Color3.new(
-                            low.R + (high.R - low.R) * health,
+                            low.R + (high.R - low.R) * health
                             low.G + (high.G - low.G) * health,
                             low.B + (high.B - low.B) * health
                         )
@@ -1149,8 +1171,8 @@ run_service.RenderStepped:Connect(function()
         if data.name then
             if esplib.name.enabled and onscreen then
                 local name_obj = data.name
-                local center_x = (min.X + max.X) / 2
-                local y = min.Y - 15
+                local center_x = math.floor((min.X + max.X) / 2)
+                local y = math.floor(min.Y - 15)
                 
                 local name_str = instance.Name
                 local tag_str = ""
@@ -1220,8 +1242,12 @@ run_service.RenderStepped:Connect(function()
         if data.distance then
             if esplib.distance.enabled and onscreen then
                 local text = data.distance
-                local center_x = (min.X + max.X) / 2
-                local y = max.Y + 5
+                local center_x = math.floor((min.X + max.X) / 2)
+                local y = math.floor(max.Y + 5)
+                
+                if esplib.healthbar.enabled and esplib.healthbar.position == "bottom" then 
+                    y = y + 4 
+                end
                 
                 text.Text = tostring(math.floor(dist)) .. "m"
                 text.Size = esplib.distance.size
@@ -1263,11 +1289,11 @@ run_service.RenderStepped:Connect(function()
                     from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
                 end
                 
-                to_pos = (min + max) / 2
+                to_pos = Vector2.new(math.floor((min.X + max.X) / 2), math.floor((min.Y + max.Y) / 2))
                 
                 -- If box is enabled, attach tracer to bottom center of box
                 if esplib.box.enabled then
-                    to_pos = Vector2.new((min.X + max.X) / 2, max.Y)
+                    to_pos = Vector2.new(math.floor((min.X + max.X) / 2), math.floor(max.Y))
                 end
                 
                 outline.From = from_pos
