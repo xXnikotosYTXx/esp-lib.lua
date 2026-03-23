@@ -34,7 +34,7 @@ getgenv().ExunysDeveloperAimbot = {
 		AliveCheck = true,
 		WallCheck = false,
 		
-		SilentAim = true, 
+		SilentAim = false, 
 		CameraAim = true, 
 		
 		Prediction = true, 
