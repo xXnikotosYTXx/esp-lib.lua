@@ -1,8 +1,7 @@
 --[[
 	Universal Aimbot & Silent Aim Module (Premium UI & Hooks)
-	- Added Universal Silent Aim (Raycast / Mouse.Hit Hooks)
-	- Fixed 'Ugly FOV' - removed jagged outlines, set to perfect 100-side smooth polygon
-	- Added passive target locking
+	- FIXED: Silent Aim completely rewritten (DotProduct check filtering + Hitscan fix)
+	- Perfect 100-side smooth FOV
 ]]
 local game = game
 local workspace = workspace
@@ -35,11 +34,11 @@ getgenv().ExunysDeveloperAimbot = {
 		AliveCheck = true,
 		WallCheck = false,
 		
-		-- Новые настройки Aim
-		SilentAim = true, -- Беспалевный изгиб пуль (Raycast / Mouse)
-		CameraAim = true, -- Классическая доводка камеры (Mouse / CFrame)
+		SilentAim = true, 
+		CameraAim = true, 
 		
-		Prediction = true,
+		Prediction = true, 
+		SilentAimPrediction = false, -- ВЫКЛЮЧЕНО! Raycast почти всегда моментальный, предикшн только ломает меткость.
 		PredictionAmount = 0.165,
 		Sensitivity = 0,
 		Sensitivity2 = 3.5, 
@@ -57,13 +56,13 @@ getgenv().ExunysDeveloperAimbot = {
 		RunRadius = 160, 
 		JumpRadius = 200, 
 		
-		NumSides = 100, -- Исходно 60, теперь 100: идеальный, сглаженный круг
-		Thickness = 1,  -- Отрисовка без лесенок
+		NumSides = 100, 
+		Thickness = 1,  
 		Transparency = 0.8,
 		Filled = false,
 		RainbowColor = false,
 		Color = Color3.fromRGB(240, 240, 240),
-		LockedColor = Color3.fromRGB(255, 80, 80) -- Приятный красный
+		LockedColor = Color3.fromRGB(255, 80, 80)
 	},
 	DeveloperSettings = {
 		UpdateMode = "RenderStepped",
@@ -80,7 +79,6 @@ local RequiredDistance = 2000
 local Typing, Running = false, false
 local Animation = nil
 local OriginalSensitivity = UserInputService.MouseDeltaSensitivity
--- Убрал Outline. В Roblox Drawing API две линии создают адские артефакты пикселей.
 Environment.FOVCircle.Visible = false
 --// Core Functions
 local function FixUsername(String)
@@ -146,7 +144,6 @@ local function GetClosestPlayer()
 			end
 		end
 	else
-		-- Трекинг смещения (осталась ли цель в радиусе)
 		local TargetCharacter = Environment.Locked.Character
 		if not TargetCharacter then CancelLock() return end
 		local TargetPart = TargetCharacter:FindFirstChild(Settings.LockPart)
@@ -160,7 +157,7 @@ local function GetClosestPlayer()
 		end
 	end
 end
---// Hooks (Universal Silent Aim)
+--// Hooks (Сверхточный Universal Silent Aim)
 if not getgenv().ExunysHooksLoaded and hookmetamethod then
 	getgenv().ExunysHooksLoaded = true
 	local OldNamecall
@@ -168,24 +165,42 @@ if not getgenv().ExunysHooksLoaded and hookmetamethod then
 		local Method = getnamecallmethod()
 		local Args = {...}
 		local Env = getgenv().ExunysDeveloperAimbot
-		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked then
+		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked and not checkcaller() then
 			local LockPart = Env.Locked.Character and Env.Locked.Character:FindFirstChild(Env.Settings.LockPart)
 			if LockPart then
 				local TargetPos = LockPart.Position
 				
-				if Env.Settings.Prediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
+				-- Предикшн для сайлента выключен через меню (для 99% игр это хитскан лучи)
+				if Env.Settings.SilentAimPrediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
 					TargetPos = TargetPos + (Env.Locked.Character.HumanoidRootPart.Velocity * Env.Settings.PredictionAmount)
 				end
-				-- Подменяем любые лучи стрельбы в мире:
 				if Method == "Raycast" and self == workspace then
 					local Origin = Args[1]
-					Args[2] = (TargetPos - Origin).Unit * (Args[2] and Args[2].Magnitude or 5000)
-					return OldNamecall(self, unpack(Args))
+					local OriginalDirection = Args[2]
+					
+					if typeof(Origin) == "Vector3" and typeof(OriginalDirection) == "Vector3" then
+						local DesiredDirection = (TargetPos - Origin).Unit
+						
+						-- Магия тут: фильтруем служебные лучи ног игры, камеры, или если выстрел был совсем в другую сторону.
+						-- Луч захватывает цель, только если мы выстрелили хотя бы ПРИМЕРНО в ее сторону.
+						if OriginalDirection.Unit:Dot(DesiredDirection) > 0.1 then
+							Args[2] = DesiredDirection * OriginalDirection.Magnitude
+							return OldNamecall(self, unpack(Args))
+						end
+					end
 				elseif (Method == "FindPartOnRayWithIgnoreList" or Method == "FindPartOnRayWithWhitelist" or Method == "FindPartOnRay") and self == workspace then
-					local Origin = Args[1].Origin
-					local Direction = (TargetPos - Origin).Unit * Args[1].Direction.Magnitude
-					Args[1] = Ray.new(Origin, Direction)
-					return OldNamecall(self, unpack(Args))
+					local RayArg = Args[1]
+					
+					if typeof(RayArg) == "Ray" then
+						local Origin = RayArg.Origin
+						local OriginalDirection = RayArg.Direction
+						local DesiredDirection = (TargetPos - Origin).Unit
+						
+						if OriginalDirection.Unit:Dot(DesiredDirection) > 0.1 then
+							Args[1] = Ray.new(Origin, DesiredDirection * OriginalDirection.Magnitude)
+							return OldNamecall(self, unpack(Args))
+						end
+					end
 				end
 			end
 		end
@@ -194,14 +209,13 @@ if not getgenv().ExunysHooksLoaded and hookmetamethod then
 	local OldIndex
 	OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
 		local Env = getgenv().ExunysDeveloperAimbot
-		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked then
-			-- Подменяем мышь игрока для стрельбы:
+		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked and not checkcaller() then
 			if self == LocalPlayer:GetMouse() then
 				local LockPart = Env.Locked.Character and Env.Locked.Character:FindFirstChild(Env.Settings.LockPart)
 				if LockPart then
 					local TargetPos = LockPart.Position
 					
-					if Env.Settings.Prediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
+					if Env.Settings.SilentAimPrediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
 						TargetPos = TargetPos + (Env.Locked.Character.HumanoidRootPart.Velocity * Env.Settings.PredictionAmount)
 					end
 					if Index == "Hit" or Index == "hit" then
@@ -259,7 +273,7 @@ local function Load()
 		else
 			FOVCircle.Visible = false
 		end
-		-- 3. Aimbot Logic: Всегда отслеживаем цели, чтобы Silent Aim работал без нажатий (пассивно)
+		-- 3. Aimbot Logic: Всегда отслеживаем цели
 		if Settings.Enabled then
 			GetClosestPlayer()
 			-- Доводка камеры/мыши (CameraAim) срабатывает только если мы жмем нужную клавишу (Running = true)
@@ -270,6 +284,7 @@ local function Load()
 				if TargetPart then
 					local TargetPosition = TargetPart.Position
 					
+					-- Предикшн тут остается, так как он полезен для плавного смещения камеры
 					if Settings.Prediction and TargetRoot then
 						local TargetVelocity = TargetRoot.Velocity
 						TargetPosition = TargetPosition + (TargetVelocity * Settings.PredictionAmount)
@@ -330,7 +345,6 @@ function Environment:Exit()
 	
 	UserInputService.MouseDeltaSensitivity = OriginalSensitivity
 	if Animation then Animation:Cancel() end
-	
 	if self.FOVCircle then self.FOVCircle:Remove() end
 	
 	getgenv().ExunysDeveloperAimbot = nil
