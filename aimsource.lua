@@ -1,6 +1,7 @@
 --[[
 	Universal Aimbot & Silent Aim Module (Premium UI & Hooks)
 	- FIXED: ZERO LAG Silent Aim (Cached Positions, no math in hooks)
+	- FIXED: Cloneref Reference Bypasses (LocalPlayer Target Bug Fix)
 ]]
 local cloneref = cloneref or function(obj) return obj end
 local game = cloneref(game)
@@ -104,10 +105,13 @@ local function GetClosestPlayer()
 	if not Environment.Locked then
 		RequiredDistance = Environment.FOVSettings.Enabled and CurrentDynamicFOV or 2000
 		for _, Player in ipairs(Players:GetPlayers()) do
-			if Player == LocalPlayer or table.find(Environment.Blacklisted, Player.Name) then continue end
-			local Character = Player.Character
+            -- ИСПРАВЛЕНИЕ ЗДЕСЬ: Проверка по .Name обходит сбои ссылок от cloneref
+			if Player.Name == LocalPlayer.Name or table.find(Environment.Blacklisted, Player.Name) then continue end
+			
+            local Character = Player.Character
 			if not Character then continue end
-			local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+			
+            local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 			local TargetPart = Character:FindFirstChild(LockPart)
 			if Humanoid and TargetPart then
 				local TeamCheckOption = Environment.DeveloperSettings.TeamCheckOption
@@ -154,7 +158,8 @@ if not getgenv().ExunysHooksLoaded and hookmetamethod then
 			local Method = getnamecallmethod()
             local Args = {...}
             
-			if Method == "Raycast" and self == workspace then
+            -- ИСПРАВЛЕНИЕ: Безопасная проверка на Workspace (обход cloneref)
+			if Method == "Raycast" and typeof(self) == "Instance" and self.ClassName == "Workspace" then
 				local Origin = Args[1]
 				local OriginalDirection = Args[2]
 				if typeof(Origin) == "Vector3" and typeof(OriginalDirection) == "Vector3" then
@@ -164,7 +169,7 @@ if not getgenv().ExunysHooksLoaded and hookmetamethod then
 						return OldNamecall(self, unpack(Args))
 					end
 				end
-			elseif (Method == "FindPartOnRayWithIgnoreList" or Method == "FindPartOnRayWithWhitelist" or Method == "FindPartOnRay") and self == workspace then
+			elseif (Method == "FindPartOnRayWithIgnoreList" or Method == "FindPartOnRayWithWhitelist" or Method == "FindPartOnRay") and typeof(self) == "Instance" and self.ClassName == "Workspace" then
 				local RayArg = Args[1]
 				if typeof(RayArg) == "Ray" then
 					local Origin = RayArg.Origin
@@ -179,11 +184,13 @@ if not getgenv().ExunysHooksLoaded and hookmetamethod then
 		end
 		return OldNamecall(self, ...)
 	end))
-	local OldIndex
+	
+    local OldIndex
 	OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
 		local Env = getgenv().ExunysDeveloperAimbot
 		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.TargetPosition and Env.TriggerActive and not checkcaller() then
-			if self == LocalPlayer:GetMouse() then
+            -- ИСПРАВЛЕНИЕ: Безопасная проверка на Мышку (обход cloneref)
+			if typeof(self) == "Instance" and self:IsA("PlayerMouse") then
 				if Index == "Hit" or Index == "hit" then
 					return CFrame.new(Env.TargetPosition)
 				elseif Index == "Target" or Index == "target" then
