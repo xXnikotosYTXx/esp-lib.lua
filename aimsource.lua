@@ -3,8 +3,10 @@
 	- FIXED: Silent Aim completely rewritten (DotProduct check filtering + Hitscan fix)
 	- Perfect 100-side smooth FOV
 ]]
-local game = game
-local workspace = workspace
+--// Bypass / Anti-Cheat
+local cloneref = cloneref or function(obj) return obj end
+local game = cloneref(game)
+local workspace = cloneref(workspace)
 local Vector2 = Vector2
 local Vector3 = Vector3
 local CFrame = CFrame
@@ -14,12 +16,12 @@ local TweenInfo = TweenInfo
 local Enum = Enum
 local unpack = unpack or table.unpack
 --// Services
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local RunService = cloneref(game:GetService("RunService"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local TweenService = cloneref(game:GetService("TweenService"))
+local Players = cloneref(game:GetService("Players"))
+local LocalPlayer = cloneref(Players.LocalPlayer)
+local Camera = cloneref(workspace.CurrentCamera)
 --// Cleanup previous instance safely
 if getgenv().ExunysDeveloperAimbot then
 	pcall(function()
@@ -236,6 +238,7 @@ local function Load()
 	local Settings = Environment.Settings
 	local FOVSettings = Environment.FOVSettings
 	local FOVCircle = Environment.FOVCircle
+	
 	ServiceConnections.RenderSteppedConnection = RunService[Environment.DeveloperSettings.UpdateMode]:Connect(function()
 		
 		-- 1. Считаем Динамический FOV
@@ -259,6 +262,7 @@ local function Load()
 		else
 			CurrentDynamicFOV = FOVSettings.BaseRadius
 		end
+		
 		-- 2. Гладкий премиум рендер FOV
 		if FOVSettings.Enabled and Settings.Enabled then
 			FOVCircle.Radius = CurrentDynamicFOV
@@ -273,6 +277,7 @@ local function Load()
 		else
 			FOVCircle.Visible = false
 		end
+		
 		-- 3. Aimbot Logic: Всегда отслеживаем цели
 		if Settings.Enabled then
 			GetClosestPlayer()
@@ -309,6 +314,7 @@ local function Load()
 			end
 		end
 	end)
+	
 	ServiceConnections.InputBeganConnection = UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 		if GameProcessed or Typing then return end
 		local TriggerKey, Toggle = Settings.TriggerKey, Settings.Toggle
@@ -322,6 +328,7 @@ local function Load()
 			end
 		end
 	end)
+	
 	ServiceConnections.InputEndedConnection = UserInputService.InputEnded:Connect(function(Input, GameProcessed)
 		if Typing then return end
 		local TriggerKey, Toggle = Settings.TriggerKey, Settings.Toggle
