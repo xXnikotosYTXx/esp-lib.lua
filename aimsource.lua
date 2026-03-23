@@ -1,11 +1,9 @@
 --[[
-	Universal Aimbot Module (Remastered & Improved)
-	- Added proper Velocity Prediction
-	- Added Dynamic FOV (Running/Jumping/Standing)
-	- Fixed Memory Leaks and Unload function
-	- Full Module API Support (Blacklist/Whitelist)
+	Universal Aimbot & Silent Aim Module (Premium UI & Hooks)
+	- Added Universal Silent Aim (Raycast / Mouse.Hit Hooks)
+	- Fixed 'Ugly FOV' - removed jagged outlines, set to perfect 100-side smooth polygon
+	- Added passive target locking
 ]]
-
 local game = game
 local workspace = workspace
 local Vector2 = Vector2
@@ -15,77 +13,66 @@ local Color3 = Color3
 local Drawing = Drawing
 local TweenInfo = TweenInfo
 local Enum = Enum
-
+local unpack = unpack or table.unpack
 --// Services
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-
 --// Cleanup previous instance safely
 if getgenv().ExunysDeveloperAimbot then
 	pcall(function()
 		getgenv().ExunysDeveloperAimbot:Exit()
 	end)
 end
-
 --// Environment Setup
 getgenv().ExunysDeveloperAimbot = {
 	Settings = {
 		Enabled = true,
-
 		TeamCheck = false,
 		AliveCheck = true,
 		WallCheck = false,
 		
+		-- Новые настройки Aim
+		SilentAim = true, -- Беспалевный изгиб пуль (Raycast / Mouse)
+		CameraAim = true, -- Классическая доводка камеры (Mouse / CFrame)
+		
 		Prediction = true,
 		PredictionAmount = 0.165,
-
 		Sensitivity = 0,
 		Sensitivity2 = 3.5, 
-
 		LockMode = 1, 
 		LockPart = "Head",
-
 		TriggerKey = Enum.UserInputType.MouseButton2,
 		Toggle = false
 	},
-
 	FOVSettings = {
 		Enabled = true,
 		Visible = true,
 		
 		Dynamic = true,
-		BaseRadius = 90,
-		RunRadius = 130, 
-		JumpRadius = 160, 
+		BaseRadius = 120,
+		RunRadius = 160, 
+		JumpRadius = 200, 
 		
-		NumSides = 60,
-		Thickness = 1,
-		Transparency = 1,
+		NumSides = 100, -- Исходно 60, теперь 100: идеальный, сглаженный круг
+		Thickness = 1,  -- Отрисовка без лесенок
+		Transparency = 0.8,
 		Filled = false,
-
 		RainbowColor = false,
-		RainbowOutlineColor = false,
-		Color = Color3.fromRGB(255, 255, 255),
-		OutlineColor = Color3.fromRGB(0, 0, 0),
-		LockedColor = Color3.fromRGB(255, 150, 150)
+		Color = Color3.fromRGB(240, 240, 240),
+		LockedColor = Color3.fromRGB(255, 80, 80) -- Приятный красный
 	},
-
 	DeveloperSettings = {
 		UpdateMode = "RenderStepped",
 		TeamCheckOption = "TeamColor",
 		RainbowSpeed = 1
 	},
-
 	Blacklisted = {},
-	FOVCircleOutline = Drawing.new("Circle"),
 	FOVCircle = Drawing.new("Circle")
 }
-
 local Environment = getgenv().ExunysDeveloperAimbot
 local CurrentDynamicFOV = Environment.FOVSettings.BaseRadius
 local ServiceConnections = {}
@@ -93,10 +80,8 @@ local RequiredDistance = 2000
 local Typing, Running = false, false
 local Animation = nil
 local OriginalSensitivity = UserInputService.MouseDeltaSensitivity
-
+-- Убрал Outline. В Roblox Drawing API две линии создают адские артефакты пикселей.
 Environment.FOVCircle.Visible = false
-Environment.FOVCircleOutline.Visible = false
-
 --// Core Functions
 local function FixUsername(String)
 	local Result
@@ -108,12 +93,10 @@ local function FixUsername(String)
 	end
 	return Result
 end
-
 local function GetRainbowColor()
 	local RainbowSpeed = Environment.DeveloperSettings.RainbowSpeed
 	return Color3.fromHSV(tick() % RainbowSpeed / RainbowSpeed, 1, 1)
 end
-
 local function CancelLock()
 	Environment.Locked = nil
 	Environment.FOVCircle.Color = Environment.FOVSettings.Color
@@ -122,14 +105,11 @@ local function CancelLock()
 		Animation:Cancel()
 	end
 end
-
 local function GetClosestPlayer()
 	local Settings = Environment.Settings
 	local LockPart = Settings.LockPart
-
 	if not Environment.Locked then
 		RequiredDistance = Environment.FOVSettings.Enabled and CurrentDynamicFOV or 2000
-
 		for _, Player in ipairs(Players:GetPlayers()) do
 			if Player == LocalPlayer or table.find(Environment.Blacklisted, Player.Name) then continue end
 			
@@ -141,15 +121,12 @@ local function GetClosestPlayer()
 			
 			if Humanoid and TargetPart then
 				local TeamCheckOption = Environment.DeveloperSettings.TeamCheckOption
-
 				if Settings.TeamCheck and Player[TeamCheckOption] == LocalPlayer[TeamCheckOption] then
 					continue
 				end
-
 				if Settings.AliveCheck and Humanoid.Health <= 0 then
 					continue
 				end
-
 				if Settings.WallCheck then
 					local RaycastParams = RaycastParams.new()
 					RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -160,10 +137,8 @@ local function GetClosestPlayer()
 					
 					if Result then continue end
 				end
-
 				local Vector, OnScreen = Camera:WorldToViewportPoint(TargetPart.Position)
 				local Distance = (UserInputService:GetMouseLocation() - Vector2.new(Vector.X, Vector.Y)).Magnitude
-
 				if Distance < RequiredDistance and OnScreen then
 					RequiredDistance = Distance
 					Environment.Locked = Player
@@ -171,6 +146,7 @@ local function GetClosestPlayer()
 			end
 		end
 	else
+		-- Трекинг смещения (осталась ли цель в радиусе)
 		local TargetCharacter = Environment.Locked.Character
 		if not TargetCharacter then CancelLock() return end
 		local TargetPart = TargetCharacter:FindFirstChild(Settings.LockPart)
@@ -184,27 +160,79 @@ local function GetClosestPlayer()
 		end
 	end
 end
-
+--// Hooks (Universal Silent Aim)
+if not getgenv().ExunysHooksLoaded and hookmetamethod then
+	getgenv().ExunysHooksLoaded = true
+	local OldNamecall
+	OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+		local Method = getnamecallmethod()
+		local Args = {...}
+		local Env = getgenv().ExunysDeveloperAimbot
+		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked then
+			local LockPart = Env.Locked.Character and Env.Locked.Character:FindFirstChild(Env.Settings.LockPart)
+			if LockPart then
+				local TargetPos = LockPart.Position
+				
+				if Env.Settings.Prediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
+					TargetPos = TargetPos + (Env.Locked.Character.HumanoidRootPart.Velocity * Env.Settings.PredictionAmount)
+				end
+				-- Подменяем любые лучи стрельбы в мире:
+				if Method == "Raycast" and self == workspace then
+					local Origin = Args[1]
+					Args[2] = (TargetPos - Origin).Unit * (Args[2] and Args[2].Magnitude or 5000)
+					return OldNamecall(self, unpack(Args))
+				elseif (Method == "FindPartOnRayWithIgnoreList" or Method == "FindPartOnRayWithWhitelist" or Method == "FindPartOnRay") and self == workspace then
+					local Origin = Args[1].Origin
+					local Direction = (TargetPos - Origin).Unit * Args[1].Direction.Magnitude
+					Args[1] = Ray.new(Origin, Direction)
+					return OldNamecall(self, unpack(Args))
+				end
+			end
+		end
+		return OldNamecall(self, ...)
+	end))
+	local OldIndex
+	OldIndex = hookmetamethod(game, "__index", newcclosure(function(self, Index)
+		local Env = getgenv().ExunysDeveloperAimbot
+		if Env and Env.Settings.Enabled and Env.Settings.SilentAim and Env.Locked then
+			-- Подменяем мышь игрока для стрельбы:
+			if self == LocalPlayer:GetMouse() then
+				local LockPart = Env.Locked.Character and Env.Locked.Character:FindFirstChild(Env.Settings.LockPart)
+				if LockPart then
+					local TargetPos = LockPart.Position
+					
+					if Env.Settings.Prediction and Env.Locked.Character:FindFirstChild("HumanoidRootPart") then
+						TargetPos = TargetPos + (Env.Locked.Character.HumanoidRootPart.Velocity * Env.Settings.PredictionAmount)
+					end
+					if Index == "Hit" or Index == "hit" then
+						return CFrame.new(TargetPos)
+					elseif Index == "Target" or Index == "target" then
+						return LockPart
+					end
+				end
+			end
+		end
+		return OldIndex(self, Index)
+	end))
+end
 --// Update Loop
 local function Load()
 	OriginalSensitivity = UserInputService.MouseDeltaSensitivity
-
+	
 	local Settings = Environment.Settings
 	local FOVSettings = Environment.FOVSettings
 	local FOVCircle = Environment.FOVCircle
-	local FOVCircleOutline = Environment.FOVCircleOutline
-
 	ServiceConnections.RenderSteppedConnection = RunService[Environment.DeveloperSettings.UpdateMode]:Connect(function()
+		
+		-- 1. Считаем Динамический FOV
 		if FOVSettings.Dynamic and LocalPlayer.Character then
 			local LocalHumanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 			local LocalRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-			
 			local TargetRadius = FOVSettings.BaseRadius
 			
 			if LocalHumanoid and LocalRoot then
 				local State = LocalHumanoid:GetState()
 				local HorizontalSpeed = Vector3.new(LocalRoot.Velocity.X, 0, LocalRoot.Velocity.Z).Magnitude
-
 				if State == Enum.HumanoidStateType.Freefall or State == Enum.HumanoidStateType.Jumping then
 					TargetRadius = FOVSettings.JumpRadius
 				elseif HorizontalSpeed > 5 then
@@ -213,44 +241,29 @@ local function Load()
 					TargetRadius = FOVSettings.BaseRadius
 				end
 			end
-			
 			CurrentDynamicFOV = CurrentDynamicFOV + (TargetRadius - CurrentDynamicFOV) * 0.1
 		else
 			CurrentDynamicFOV = FOVSettings.BaseRadius
 		end
-
+		-- 2. Гладкий премиум рендер FOV
 		if FOVSettings.Enabled and Settings.Enabled then
 			FOVCircle.Radius = CurrentDynamicFOV
-			FOVCircleOutline.Radius = CurrentDynamicFOV
-			
 			FOVCircle.Visible = FOVSettings.Visible
-			FOVCircleOutline.Visible = FOVSettings.Visible
-			
 			FOVCircle.NumSides = FOVSettings.NumSides
-			FOVCircleOutline.NumSides = FOVSettings.NumSides
-
 			FOVCircle.Thickness = FOVSettings.Thickness
-			FOVCircleOutline.Thickness = FOVSettings.Thickness + 1
-			
 			FOVCircle.Filled = FOVSettings.Filled
 			FOVCircle.Transparency = FOVSettings.Transparency
-			FOVCircleOutline.Transparency = FOVSettings.Transparency
-
-			FOVCircle.Color = Environment.Locked and FOVSettings.LockedColor or (FOVSettings.RainbowColor and GetRainbowColor() or FOVSettings.Color)
-			FOVCircleOutline.Color = FOVSettings.RainbowOutlineColor and GetRainbowColor() or FOVSettings.OutlineColor
 			
-			local MousePos = UserInputService:GetMouseLocation()
-			FOVCircle.Position = MousePos
-			FOVCircleOutline.Position = MousePos
+			FOVCircle.Color = Environment.Locked and FOVSettings.LockedColor or (FOVSettings.RainbowColor and GetRainbowColor() or FOVSettings.Color)
+			FOVCircle.Position = UserInputService:GetMouseLocation()
 		else
 			FOVCircle.Visible = false
-			FOVCircleOutline.Visible = false
 		end
-
-		if Running and Settings.Enabled then
+		-- 3. Aimbot Logic: Всегда отслеживаем цели, чтобы Silent Aim работал без нажатий (пассивно)
+		if Settings.Enabled then
 			GetClosestPlayer()
-
-			if Environment.Locked and Environment.Locked.Character then
+			-- Доводка камеры/мыши (CameraAim) срабатывает только если мы жмем нужную клавишу (Running = true)
+			if Environment.Locked and Running and Settings.CameraAim then
 				local TargetRoot = Environment.Locked.Character:FindFirstChild("HumanoidRootPart")
 				local TargetPart = Environment.Locked.Character:FindFirstChild(Settings.LockPart)
 				
@@ -261,7 +274,6 @@ local function Load()
 						local TargetVelocity = TargetRoot.Velocity
 						TargetPosition = TargetPosition + (TargetVelocity * Settings.PredictionAmount)
 					end
-
 					local LockedViewportPos = Camera:WorldToViewportPoint(TargetPosition)
 					
 					if Settings.LockMode == 2 then
@@ -282,7 +294,6 @@ local function Load()
 			end
 		end
 	end)
-
 	ServiceConnections.InputBeganConnection = UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 		if GameProcessed or Typing then return end
 		local TriggerKey, Toggle = Settings.TriggerKey, Settings.Toggle
@@ -296,7 +307,6 @@ local function Load()
 			end
 		end
 	end)
-
 	ServiceConnections.InputEndedConnection = UserInputService.InputEnded:Connect(function(Input, GameProcessed)
 		if Typing then return end
 		local TriggerKey, Toggle = Settings.TriggerKey, Settings.Toggle
@@ -307,15 +317,8 @@ local function Load()
 		end
 	end)
 end
-
-ServiceConnections.TypingStartedConnection = UserInputService.TextBoxFocused:Connect(function()
-	Typing = true
-end)
-
-ServiceConnections.TypingEndedConnection = UserInputService.TextBoxFocusReleased:Connect(function()
-	Typing = false
-end)
-
+ServiceConnections.TypingStartedConnection = UserInputService.TextBoxFocused:Connect(function() Typing = true end)
+ServiceConnections.TypingEndedConnection = UserInputService.TextBoxFocusReleased:Connect(function() Typing = false end)
 --// Exported Functions / Module API
 function Environment:Exit()
 	for _, Connection in pairs(ServiceConnections) do
@@ -329,23 +332,19 @@ function Environment:Exit()
 	if Animation then Animation:Cancel() end
 	
 	if self.FOVCircle then self.FOVCircle:Remove() end
-	if self.FOVCircleOutline then self.FOVCircleOutline:Remove() end
 	
 	getgenv().ExunysDeveloperAimbot = nil
 end
-
 function Environment:Restart()
 	self:Exit()
 	Load()
 end
-
 function Environment:Blacklist(Username)
 	assert(Username, "Aimbot Module: Missing parameter 'Username'.")
 	Username = FixUsername(Username)
 	assert(Username, "Aimbot Module: User couldn't be found.")
 	table.insert(self.Blacklisted, Username)
 end
-
 function Environment:Whitelist(Username)
 	assert(Username, "Aimbot Module: Missing parameter 'Username'.")
 	Username = FixUsername(Username)
@@ -354,15 +353,12 @@ function Environment:Whitelist(Username)
 	assert(Index, "Aimbot Module: User " .. Username .. " is not blacklisted.")
 	table.remove(self.Blacklisted, Index)
 end
-
 function Environment.GetClosestPlayer()
 	GetClosestPlayer()
 	local Value = Environment.Locked
 	CancelLock()
 	return Value
 end
-
 Environment.Load = Load
 setmetatable(Environment, {__call = Load})
-
 return Environment
