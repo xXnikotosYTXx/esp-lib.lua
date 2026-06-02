@@ -403,11 +403,13 @@ function espfunctions.add_box(instance)
     
     local outline = Drawing.new("Square")
     outline.Filled = false
+    outline.Thickness = 3
     outline.Transparency = 1
     outline.Visible = false
     
     local fill = Drawing.new("Square")
     fill.Filled = false
+    fill.Thickness = 1
     fill.Transparency = 1
     fill.Visible = false
     
