@@ -6,73 +6,89 @@ entity-esp-lib.lua
 
 local entityesp = getgenv().entityesp
 if not entityesp then
-    entityesp = {
-        box = {
-            enabled = true,
-            type = "normal", -- normal, corner
-            padding = 1.15,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-        },
-        healthbar = {
-            enabled = true, -- будет работать, если у NPC есть Humanoid
-            fill = Color3.new(0,1,0),
-            outline = Color3.new(0,0,0),
-            gradient = true,
-            low_color = Color3.new(1,0,0),
-            high_color = Color3.new(0,1,0),
-            position = "left", -- left, right, bottom
-        },
-        name = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-            show_health = false,
-        },
-        distance = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-        },
-        tracer = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-            from = "bottom", -- mouse, head, top, bottom, center
-        },
-        fade = {
-            enabled = false,
-            max_distance = 500,
-            min_transparency = 0.3,
-            hover_enabled = true,
-            hover_radius = 200,
-            hover_transparency = 1.0,
-            animation_speed = 0.25,
-        },
-        visibility = {
-            enabled = false,
-            visible_color = Color3.new(0, 1, 0),
-            hidden_color = Color3.new(1, 0, 0),
-        },
-        glow = {
-            enabled = false,
-            intensity = 0.4,
-            size = 1.5,
-            color = Color3.new(0, 0.8, 1),
-            max_distance = 150,
-        },
-        animations = {
-            enabled = true,
-            speed = 0.2,
-            health_smooth = true,
-            fade_in = true,
-            rainbow = false,
-            rainbow_speed = 0.05,
-            pulse = false,
-            pulse_speed = 0.1,
-        },
-    }
+    entityesp = {}
     getgenv().entityesp = entityesp
+end
+
+-- Дефолтная структура конфигурации (для заполнения отсутствующих полей)
+local defaults = {
+    box = {
+        enabled = true,
+        type = "normal", -- normal, corner
+        padding = 1.15,
+        fill = Color3.new(1,1,1),
+        outline = Color3.new(0,0,0),
+    },
+    healthbar = {
+        enabled = true, -- будет работать, если у NPC есть Humanoid
+        fill = Color3.new(0,1,0),
+        outline = Color3.new(0,0,0),
+        gradient = true,
+        low_color = Color3.new(1,0,0),
+        high_color = Color3.new(0,1,0),
+        position = "left", -- left, right, bottom
+    },
+    name = {
+        enabled = true,
+        fill = Color3.new(1,1,1),
+        size = 13,
+        show_health = false,
+    },
+    distance = {
+        enabled = true,
+        fill = Color3.new(1,1,1),
+        size = 13,
+    },
+    tracer = {
+        enabled = true,
+        fill = Color3.new(1,1,1),
+        outline = Color3.new(0,0,0),
+        from = "bottom", -- mouse, head, top, bottom, center
+    },
+    fade = {
+        enabled = false,
+        max_distance = 500,
+        min_transparency = 0.3,
+        hover_enabled = true,
+        hover_radius = 200,
+        hover_transparency = 1.0,
+        animation_speed = 0.25,
+    },
+    visibility = {
+        enabled = false,
+        visible_color = Color3.new(0, 1, 0),
+        hidden_color = Color3.new(1, 0, 0),
+    },
+    glow = {
+        enabled = false,
+        intensity = 0.4,
+        size = 1.5,
+        color = Color3.new(0, 0.8, 1),
+        max_distance = 150,
+    },
+    animations = {
+        enabled = true,
+        speed = 0.2,
+        health_smooth = true,
+        fade_in = true,
+        rainbow = false,
+        rainbow_speed = 0.05,
+        pulse = false,
+        pulse_speed = 0.1,
+    },
+}
+
+-- Безопасное заполнение структуры без перезаписи уже настроенных параметров
+for category, settings in pairs(defaults) do
+    if not entityesp[category] then
+        entityesp[category] = settings
+    else
+        for setting, value in pairs(settings) do
+            if entityesp[category][setting] == nil then
+                entityesp[category][setting] = value
+            end
+        end
+    end
 end
 
 local espinstances = {}
