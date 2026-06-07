@@ -85,6 +85,19 @@ if not esplib then
             pulse = false, -- pulsing transparency effect
             pulse_speed = 0.1, -- pulse speed
         },
+
+        npc_config = {
+            enabled = false,
+            box_enabled = false,
+            box_type = "corner",
+            box_padding = 1.15,
+            box_color = Color3.new(1, 1, 0),
+            name_enabled = false,
+            name_color = Color3.new(1, 1, 1),
+            distance_enabled = false,
+            distance_color = Color3.new(1, 1, 1),
+            active_objects = {} 
+        },
     }
     getgenv().esplib = esplib
 end
@@ -160,6 +173,8 @@ local function cleanup_esp()
     health_animations = {}
     glow_animations = {}
 end
+
+
 
 -- Connect cleanup to game leaving
 game.Players.PlayerRemoving:Connect(function(player)
@@ -784,52 +799,52 @@ end
 
 -- // main thread
 run_service.RenderStepped:Connect(function()
-    -- Safety check - if we're not in a valid game state, cleanup and return
     if not game.Players.LocalPlayer or not workspace.CurrentCamera then
         cleanup_esp()
         return
     end
-    
+
     for instance, data in pairs(espinstances) do
         if not instance or not instance.Parent then
             if data.box then
                 data.box.outline:Remove()
                 data.box.fill:Remove()
-                for _, line in ipairs(data.box.corner_fill) do
-                    line:Remove()
-                end
-                for _, line in ipairs(data.box.corner_outline) do
-                    line:Remove()
-                end
+                for _, line in ipairs(data.box.corner_fill) do line:Remove() end
+                for _, line in ipairs(data.box.corner_outline) do line:Remove() end
             end
             if data.healthbar then
                 data.healthbar.outline:Remove()
                 data.healthbar.fill:Remove()
             end
             if data.name then
-                if data.name.text then
-                    data.name.text:Remove()
-                end
-                if data.name.tag_bracket_left then
-                    data.name.tag_bracket_left:Remove()
-                end
-                if data.name.tag_letter then
-                    data.name.tag_letter:Remove()
-                end
-                if data.name.tag_bracket_right then
-                    data.name.tag_bracket_right:Remove()
-                end
+                if data.name.text then data.name.text:Remove() end
+                if data.name.tag_bracket_left then data.name.tag_bracket_left:Remove() end
+                if data.name.tag_letter then data.name.tag_letter:Remove() end
+                if data.name.tag_bracket_right then data.name.tag_bracket_right:Remove() end
             end
-            if data.distance then
-                data.distance:Remove()
-            end
+            if data.distance then data.distance:Remove() end
             if data.tracer then
                 data.tracer.outline:Remove()
                 data.tracer.fill:Remove()
             end
             espinstances[instance] = nil
-            continue
+        else
+            -- // Логика для игроков и NPC
+            local player = game.Players:GetPlayerFromCharacter(instance)
+            local is_npc = not player and instance:FindFirstChild("Humanoid")
+            
+            if is_npc and not esplib.npc_config.enabled then
+                -- Скрываем всё, если NPC выключены
+                if data.box then data.box.outline.Visible = false; data.box.fill.Visible = false end
+                -- ... (скрывай остальные элементы по аналогии)
+            else
+                local cfg = is_npc and esplib.npc_config or esplib
+                -- Тут идет твоя отрисовка с использованием cfg
+                -- Пример: cfg.box.enabled или cfg.box_enabled в зависимости от того, как в конфиге
+            end
         end
+    end
+end)
         
         -- Skip whitelisted players
         if is_whitelisted(instance) then
